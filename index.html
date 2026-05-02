@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avatar Creator — Prototype</title>
+<style>
+/* ============================================================
+   DESIGN TOKENS — easy to swap to Figma values later
+   ============================================================ */
+:root {
+  /* Surfaces */
+  --surface-toolbar: rgba(20, 20, 22, 0.92);
+  --surface-tray: #161618;
+  --surface-elev: #1f1f23;
+  --surface-pill: rgba(28, 28, 32, 0.85);
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-tertiary: rgba(255, 255, 255, 0.45);
+
+  /* Brand */
+  --brand-blue: #2563eb;
+  --brand-blue-hover: #1d4ed8;
+
+  /* Lines */
+  --divider: rgba(255, 255, 255, 0.08);
+  --selected: rgba(255, 255, 255, 0.16);
+
+  /* Radii */
+  --r-pill: 999px;
+  --r-tile: 12px;
+  --r-card: 16px;
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+
+  /* Toolbar dims */
+  --tray-w: 320px;
+  --tool-icon: 44px;
+
+  /* Type */
+  --font-display: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-tray: 280ms;
+  --dur-fast: 120ms;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-display);
+  background: radial-gradient(ellipse at top, #1a1d24 0%, #0a0c11 100%);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+/* ============================================================
+   PHONE FRAME (landscape iPhone)
+   ============================================================ */
+.phone-frame {
+  position: relative;
+  width: 912px;
+  height: 453px;
+  background: #000;
+  border-radius: 52px;
+  padding: 16px 14px;
+  box-shadow:
+    0 0 0 2px #1a1a1a,
+    0 0 0 4px #2a2a2a,
+    0 30px 80px rgba(0, 0, 0, 0.6),
+    0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.phone-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 38px;
+  overflow: hidden;
+  background: #000;
+}
+
+/* Dynamic Island (left side in landscape) */
+.dynamic-island {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 110px;
+  background: #000;
+  border-radius: 18px;
+  z-index: 100;
+  pointer-events: none;
+}
+.dynamic-island::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  box-shadow: 0 0 0 2px #0a0a0a;
+}
+.dynamic-island::after {
+  content: '';
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d4a017;
+  opacity: 0.8;
+  box-shadow: 0 0 6px rgba(212, 160, 23, 0.5);
+}
+
+/* ============================================================
+   STAGE — the canvas + background
+   ============================================================ */
+.stage {
+  position: absolute;
+  inset: 0;
+  background-image: url('./assets/scene.png');
+  background-size: cover;
+  background-position: center;
+  /* hide the toolbar UI from the original screenshot */
+}
+
+/* Mask the original UI in the screenshot with subtle gradient overlays */
+.stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* subtle scrim to unify */
+  background: linear-gradient(180deg, rgba(0,0,0,0.05) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.1) 100%);
+  pointer-events: none;
+}
+
+/* The drawable canvas — clipped to roughly the head area */
+.draw-canvas {
+  position: absolute;
+  /* face rough bounds from the screenshot */
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* ============================================================
+   TOP BAR — left + right pill buttons
+   ============================================================ */
+.top-bar {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 18px;
+  z-index: 50;
+  pointer-events: none;
+}
+.top-group {
+  display: flex;
+  gap: 6px;
+  background: var(--surface-toolbar);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--r-pill);
+  padding: 4px;
+  pointer-events: auto;
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  color: var(--text-primary);
+}
+.icon-btn:hover { opacity: 0.7; }
+.icon-btn:active { background: var(--selected); }
+.icon-btn svg { width: 20px; height: 20px; display: block; }
+.icon-btn.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+/* ============================================================
+   BOTTOM TOOLBAR — main tool selector
+   ============================================================ */
+.bottom-toolbar {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  background: var(--surface-toolbar);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--r-pill);
+  padding: 6px;
+  z-index: 60;
+  transition: transform 200ms var(--ease-out);
+}
+
+.bottom-toolbar.tray-open {
+  /* shift left so it's not hidden behind the tray */
+  transform: translateX(calc(-50% - calc(var(--tray-w) / 2)));
+}
+
+.tool-btn {
+  width: 44px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+  position: relative;
+  padding: 0;
+}
+.tool-btn:hover { opacity: 0.75; }
+.tool-btn.active {
+  background: var(--selected);
+}
+.tool-btn svg { width: 22px; height: 22px; display: block; }
+
+/* Image-based tool icons (PNG assets from Figma) */
+.tool-btn img {
+  width: 36px;
+  height: 36px;
+  display: block;
+  pointer-events: none;
+  /* Hide the baked-in dark background by blending with toolbar */
+  mix-blend-mode: screen;
+}
+.tool-btn .icon-on { display: none; }
+.tool-btn .icon-off { display: block; }
+.tool-btn.active .icon-on { display: block; }
+.tool-btn.active .icon-off { display: none; }
+
+/* Conditional tools (eraser, pattern) — slide in animation */
+.tool-btn.conditional {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
+  transition: width 220ms var(--ease-out), opacity 180ms var(--ease-out), margin 220ms var(--ease-out);
+}
+.tool-btn.conditional.visible {
+  width: 44px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ============================================================
+   ROBUX / COST BUTTON
+   ============================================================ */
+.robux-btn {
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--brand-blue);
+  border: none;
+  color: white;
+  padding: 10px 16px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  z-index: 60;
+  transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
+}
+.robux-btn:hover { background: var(--brand-blue-hover); }
+.robux-btn:active { transform: scale(0.97); }
+.robux-icon {
+  width: 18px;
+  height: 18px;
+  background: rgba(255,255,255,0.18);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* ============================================================
+   SIDE TRAY
+   ============================================================ */
+.tray {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--tray-w);
+  background: var(--surface-tray);
+  padding: 8px 8px 20px 8px;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform var(--dur-tray) var(--ease-out);
+  border-left: 1px solid var(--divider);
+}
+.tray.open { transform: translateX(0); }
+.tray.no-anim { transition: none; }
+
+.tray-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 8px 8px 8px;
+}
+.tray-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.tray-header-actions {
+  display: flex;
+  gap: 4px;
+}
+.tray-icon-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.tray-icon-btn:hover { background: var(--selected); color: var(--text-primary); }
+.tray-icon-btn svg { width: 16px; height: 16px; }
+
+.tray-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+.tray-body::-webkit-scrollbar { width: 6px; }
+.tray-body::-webkit-scrollbar-track { background: transparent; }
+.tray-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+/* Tray content panels */
+.panel { display: none; }
+.panel.active { display: block; animation: panelFade 160ms var(--ease-out); }
+@keyframes panelFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ============================================================
+   BRUSH PANEL CONTROLS
+   ============================================================ */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+}
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 22px;
+  border-radius: 11px;
+  background: rgba(255,255,255,0.15);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+.toggle.on { background: var(--text-primary); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  transition: transform var(--dur-fast) var(--ease-out);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle.on::after {
+  transform: translateX(14px);
+  background: white;
+}
+.toggle.on::before {
+  content: '✓';
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: black;
+  font-size: 10px;
+  font-weight: 800;
+  z-index: 2;
+}
+.toggle-label {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.section-label {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 14px 4px 8px 4px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 4px 14px 4px;
+}
+.slider-preview {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--divider);
+}
+.slider-preview .dot {
+  border-radius: 50%;
+  background: var(--text-primary);
+  transition: width var(--dur-fast), height var(--dur-fast), filter var(--dur-fast);
+}
+.slider-preview .dot.outlined {
+  background: transparent;
+  border: 1.5px solid var(--text-primary);
+}
+
+.slider-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.slider-stack .stack-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: none;
+}
+
+/* Color section */
+.color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+  margin-top: 4px;
+}
+.metallic-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.metallic-row .toggle-label { font-size: 13px; }
+
+/* SV picker */
+.sv-picker {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  border-radius: 8px;
+  margin: 8px 0;
+  cursor: crosshair;
+  overflow: hidden;
+}
+.sv-picker .sv-thumb {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid white;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.3);
+}
+
+/* Hue slider */
+.hue-slider {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  margin: 10px 0 8px 0;
+  background: linear-gradient(90deg,
+    #ff0000 0%, #ffff00 17%, #00ff00 33%,
+    #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+  cursor: pointer;
+}
+.hue-slider .hue-thumb,
+.alpha-slider .alpha-thumb {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid white;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+}
+
+.alpha-slider {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  margin: 8px 0;
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255,255,255,0.15) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.15) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.15) 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  cursor: pointer;
+}
+.alpha-slider .alpha-gradient {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+}
+
+/* Palette */
+.palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+.swatch, .swatch-add {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  border: none;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.swatch:hover, .swatch-add:hover { transform: scale(1.08); }
+.swatch.selected {
+  box-shadow: 0 0 0 2px white, 0 0 0 4px var(--brand-blue);
+}
+.swatch-add {
+  background: rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 300;
+}
+.swatch-add:hover { background: rgba(255,255,255,0.15); color: var(--text-primary); }
+
+/* Long-press popup */
+.swatch-popup {
+  position: fixed;
+  background: var(--surface-elev);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 200;
+  display: none;
+  border: 1px solid var(--divider);
+}
+.swatch-popup.visible { display: block; }
+.swatch-popup button {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+.swatch-popup button:hover { background: var(--selected); }
+
+/* Placeholder content for unfinished trays */
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 240px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+  gap: 10px;
+}
+.placeholder-content svg {
+  width: 32px;
+  height: 32px;
+  opacity: 0.4;
+}
+
+/* Eraser tray — only one slider */
+.eraser-panel .slider-row { padding-top: 12px; }
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+.toast {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface-elev);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms, transform 200ms;
+  z-index: 200;
+  border: 1px solid var(--divider);
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================================
+   HELP TEXT (outside frame)
+   ============================================================ */
+.help {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  text-align: center;
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+</style>
+</head>
+<body>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <!-- BACKGROUND SCENE -->
+    <div class="stage">
+      <!-- Drawable canvas — clipped to head -->
+      <canvas class="draw-canvas" id="drawCanvas"></canvas>
+    </div>
+
+    <!-- DYNAMIC ISLAND (left in landscape) -->
+    <div class="dynamic-island"></div>
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <div class="top-group">
+        <button class="icon-btn" data-action="tap-only" aria-label="Diamond">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 L22 12 L12 22 L2 12 Z"/></svg>
+        </button>
+        <button class="icon-btn" data-action="tap-only" aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <button class="icon-btn" data-action="tap-only" aria-label="Chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5z"/></svg>
+        </button>
+      </div>
+      <div class="top-group">
+        <button class="icon-btn" id="undoBtn" aria-label="Undo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+        </button>
+        <button class="icon-btn" id="redoBtn" aria-label="Redo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg>
+        </button>
+        <button class="icon-btn" id="refreshBtn" aria-label="Reset">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+        </button>
+        <button class="icon-btn" data-action="tap-only" aria-label="Avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+        </button>
+        <button class="icon-btn" data-action="tap-only" aria-label="Exit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H5v14h4"/><path d="M14 9l5 3-5 3"/><path d="M19 12H9"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- BOTTOM TOOLBAR -->
+    <div class="bottom-toolbar" id="bottomToolbar">
+      <!-- Makeup: round powder compact + lipstick tube -->
+      <button class="tool-btn" data-tool="makeup" aria-label="Makeup">
+        <img class="icon-off" src="./assets/icons/makeup_off.png" alt="">
+        <img class="icon-on" src="./assets/icons/makeup_on.png" alt="">
+      </button>
+      <!-- Brush: paintbrush angled -->
+      <button class="tool-btn" data-tool="brush" aria-label="Brush">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 4 L20 10 L11 19 L5 19 L5 13 Z"/>
+          <line x1="14" y1="4" x2="20" y2="10" stroke-width="1.6"/>
+          <line x1="11" y1="13" x2="14" y2="16"/>
+        </svg>
+      </button>
+      <!-- Eraser (conditional, after brush) -->
+      <button class="tool-btn conditional" data-tool="eraser" aria-label="Eraser">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 3 L21 8 L11 18 L4 18 L4 13 Z"/>
+          <line x1="9" y1="8" x2="16" y2="15"/>
+          <line x1="4" y1="18" x2="14" y2="18"/>
+        </svg>
+      </button>
+      <!-- Sticker: rounded smiley/face sticker -->
+      <button class="tool-btn" data-tool="sticker" aria-label="Sticker">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4 Q4 3 5 3 L17 3 Q19 3 19 5 L19 14 Q19 15 18 15 L15 15 Q14 15 13 16 L8 21 Q5 21 5 18 L5 5 Q5 4 4 4 Z"/>
+          <circle cx="9" cy="10" r="0.9" fill="currentColor" stroke="none"/>
+          <circle cx="14" cy="10" r="0.9" fill="currentColor" stroke="none"/>
+          <path d="M9.5 13.5 Q11.5 15 13.5 13.5"/>
+        </svg>
+      </button>
+      <!-- Pattern (conditional, after sticker) — 4x4 dot grid -->
+      <button class="tool-btn conditional" data-tool="pattern" aria-label="Pattern">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="6" cy="6" r="1.1"/><circle cx="11" cy="6" r="1.1"/><circle cx="16" cy="6" r="1.1"/>
+          <circle cx="6" cy="11" r="1.1"/><circle cx="11" cy="11" r="1.1"/><circle cx="16" cy="11" r="1.1"/>
+          <circle cx="6" cy="16" r="1.1"/><circle cx="11" cy="16" r="1.1"/><circle cx="16" cy="16" r="1.1"/>
+        </svg>
+      </button>
+      <!-- Eyelash/Eyebrow: closed eyes with lashes -->
+      <button class="tool-btn" data-tool="lashes" aria-label="Eyelash & Eyebrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Left closed eye -->
+          <path d="M3 13 Q6 10 9 13"/>
+          <line x1="3.2" y1="13" x2="2.5" y2="15"/>
+          <line x1="4.5" y1="13.6" x2="4" y2="15.5"/>
+          <line x1="6" y1="13.8" x2="6" y2="16"/>
+          <line x1="7.5" y1="13.6" x2="8" y2="15.5"/>
+          <line x1="8.8" y1="13" x2="9.5" y2="15"/>
+          <!-- Right closed eye -->
+          <path d="M15 13 Q18 10 21 13"/>
+          <line x1="15.2" y1="13" x2="14.5" y2="15"/>
+          <line x1="16.5" y1="13.6" x2="16" y2="15.5"/>
+          <line x1="18" y1="13.8" x2="18" y2="16"/>
+          <line x1="19.5" y1="13.6" x2="20" y2="15.5"/>
+          <line x1="20.8" y1="13" x2="21.5" y2="15"/>
+        </svg>
+      </button>
+      <!-- Kitbash: hash/grid (#) -->
+      <button class="tool-btn" data-tool="kitbash" aria-label="Kitbash">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <line x1="9" y1="3" x2="7" y2="21"/>
+          <line x1="17" y1="3" x2="15" y2="21"/>
+          <line x1="3" y1="9" x2="21" y2="9"/>
+          <line x1="3" y1="15" x2="21" y2="15"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- ROBUX BUTTON -->
+    <button class="robux-btn" id="robuxBtn">
+      <span class="robux-icon">R$</span>
+      <span>175</span>
+    </button>
+
+    <!-- SIDE TRAY -->
+    <aside class="tray" id="tray">
+      <div class="tray-header">
+        <div class="tray-title" id="trayTitle">Paintbrush</div>
+        <div class="tray-header-actions">
+          <button class="tray-icon-btn" id="trayClearBtn" aria-label="Clear">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            </svg>
+          </button>
+          <button class="tray-icon-btn" id="trayCloseBtn" aria-label="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="tray-body">
+        <!-- BRUSH PANEL -->
+        <div class="panel" id="panel-brush">
+          <div class="toggle-row">
+            <div class="toggle on" data-toggle="mirror"></div>
+            <div class="toggle-label">Mirror brush</div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle on" data-toggle="snap"></div>
+            <div class="toggle-label">Snap to grid</div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle on" data-toggle="hide"></div>
+            <div class="toggle-label">Hide accessories</div>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-preview"><div class="dot outlined" id="brushSizePreview" style="width:8px;height:8px;"></div></div>
+            <div class="slider-stack">
+              <div class="stack-label">Brush size</div>
+              <input type="range" id="brushSize" min="2" max="40" value="12">
+            </div>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-preview"><div class="dot" id="brushSoftPreview" style="width:18px;height:18px;"></div></div>
+            <div class="slider-stack">
+              <div class="stack-label">Softness</div>
+              <input type="range" id="brushSoftness" min="0" max="100" value="20">
+            </div>
+          </div>
+
+          <div class="color-row">
+            <div class="section-label" style="margin:0;">Color</div>
+            <div class="metallic-row">
+              <div class="toggle" data-toggle="metallic"></div>
+              <div class="toggle-label">Metallic Effect</div>
+            </div>
+          </div>
+
+          <div class="sv-picker" id="svPicker">
+            <div class="sv-thumb" id="svThumb"></div>
+          </div>
+
+          <div class="hue-slider" id="hueSlider">
+            <div class="hue-thumb" id="hueThumb"></div>
+          </div>
+
+          <div class="alpha-slider" id="alphaSlider">
+            <div class="alpha-gradient" id="alphaGradient"></div>
+            <div class="alpha-thumb" id="alphaThumb"></div>
+          </div>
+
+          <div class="palette" id="palette"></div>
+        </div>
+
+        <!-- ERASER PANEL -->
+        <div class="panel eraser-panel" id="panel-eraser">
+          <div class="slider-row">
+            <div class="slider-preview"><div class="dot outlined" id="eraserSizePreview" style="width:14px;height:14px;"></div></div>
+            <div class="slider-stack">
+              <div class="stack-label">Brush Size</div>
+              <input type="range" id="eraserSize" min="4" max="60" value="20">
+            </div>
+          </div>
+        </div>
+
+        <!-- PLACEHOLDER PANELS -->
+        <div class="panel" id="panel-makeup">
+          <div class="placeholder-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/></svg>
+            <div>Makeup tray<br>Coming next — with layers panel</div>
+          </div>
+        </div>
+        <div class="panel" id="panel-sticker">
+          <div class="placeholder-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/></svg>
+            <div>Sticker library<br>Coming next</div>
+          </div>
+        </div>
+        <div class="panel" id="panel-pattern">
+          <div class="placeholder-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            <div>Pattern library<br>Coming next</div>
+          </div>
+        </div>
+        <div class="panel" id="panel-lashes">
+          <div class="placeholder-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 13c3 4 15 4 18 0"/></svg>
+            <div>Eyelash & Eyebrow<br>Coming next</div>
+          </div>
+        </div>
+        <div class="panel" id="panel-kitbash">
+          <div class="placeholder-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+            <div>Kitbash<br>Coming next</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- LONG-PRESS POPUP -->
+    <div class="swatch-popup" id="swatchPopup">
+      <button id="swatchPopupErase">Erase</button>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<div class="help">Tap brush to draw • Long-press a swatch to remove • Drag color picker to change brush color</div>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  activeTool: null,    // 'brush' | 'eraser' | 'makeup' | 'sticker' | 'pattern' | 'lashes' | 'addons' | null
+  brushSelected: false, // true when brush tool last picked (controls eraser availability)
+  stickerSelected: false, // true when sticker last picked (controls pattern availability)
+  // Brush settings
+  brushSize: 12,
+  brushSoftness: 20,
+  metallic: false,
+  // Color HSV + alpha
+  h: 220, s: 0.85, v: 0.95, a: 1,
+  // Palette (default 7 + add button)
+  palette: ['#2563eb','#a87859','#f1c5a4','#f3dec3','#ffffff','#cdcdd0','#5a5a60','#7a3a1f'],
+  // Drawing history
+  history: [],
+  redoStack: [],
+};
+
+/* ============================================================
+   CANVAS SETUP
+   ============================================================ */
+const canvas = document.getElementById('drawCanvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  // Save current image data
+  let saved = null;
+  if (canvas.width > 0) {
+    try { saved = canvas.toDataURL(); } catch(e) {}
+  }
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  if (saved) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+    img.src = saved;
+  }
+}
+window.addEventListener('resize', resizeCanvas);
+setTimeout(resizeCanvas, 50);
+
+/* Head clipping mask — rough ellipse roughly matching the face position in the bg */
+function isInsideHead(x, y) {
+  const rect = canvas.getBoundingClientRect();
+  const cx = rect.width * 0.5;       // head center x
+  const cy = rect.height * 0.42;     // head center y (roughly upper-middle)
+  const rx = rect.width * 0.11;      // head half-width
+  const ry = rect.height * 0.34;     // head half-height
+  const dx = (x - cx) / rx;
+  const dy = (y - cy) / ry;
+  return dx*dx + dy*dy <= 1;
+}
+
+/* ============================================================
+   COLOR HELPERS
+   ============================================================ */
+function hsvToRgb(h, s, v) {
+  h = h / 360;
+  let r, g, b;
+  const i = Math.floor(h * 6);
+  const f = h * 6 - i;
+  const p = v * (1 - s);
+  const q = v * (1 - f * s);
+  const t = v * (1 - (1 - f) * s);
+  switch (i % 6) {
+    case 0: r = v; g = t; b = p; break;
+    case 1: r = q; g = v; b = p; break;
+    case 2: r = p; g = v; b = t; break;
+    case 3: r = p; g = q; b = v; break;
+    case 4: r = t; g = p; b = v; break;
+    case 5: r = v; g = p; b = q; break;
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function getCurrentColor(alpha = state.a) {
+  const [r, g, b] = hsvToRgb(state.h, state.s, state.v);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function getCurrentColorHex() {
+  const [r, g, b] = hsvToRgb(state.h, state.s, state.v);
+  return '#' + [r,g,b].map(x => x.toString(16).padStart(2,'0')).join('');
+}
+
+/* ============================================================
+   DRAWING
+   ============================================================ */
+let drawing = false;
+let lastPoint = null;
+let currentStroke = null;
+
+function getEventPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const ev = e.touches ? e.touches[0] : e;
+  return {
+    x: ev.clientX - rect.left,
+    y: ev.clientY - rect.top
+  };
+}
+
+function startStroke(e) {
+  if (state.activeTool !== 'brush' && state.activeTool !== 'eraser') return;
+  const p = getEventPos(e);
+  if (!isInsideHead(p.x, p.y)) return;
+  drawing = true;
+  lastPoint = p;
+  // Save snapshot for undo
+  pushHistory();
+  // Draw initial dot
+  drawSegment(p, p);
+  e.preventDefault();
+}
+
+function moveStroke(e) {
+  if (!drawing) return;
+  const p = getEventPos(e);
+  // If we leave the head boundary, treat as lift
+  if (!isInsideHead(p.x, p.y)) {
+    lastPoint = null;
+    return;
+  }
+  if (lastPoint) {
+    drawSegment(lastPoint, p);
+  }
+  lastPoint = p;
+  e.preventDefault();
+}
+
+function endStroke() {
+  if (!drawing) return;
+  drawing = false;
+  lastPoint = null;
+}
+
+function drawSegment(from, to) {
+  ctx.save();
+  // Clip to head
+  const rect = canvas.getBoundingClientRect();
+  ctx.beginPath();
+  ctx.ellipse(rect.width * 0.5, rect.height * 0.42, rect.width * 0.11, rect.height * 0.34, 0, 0, Math.PI*2);
+  ctx.clip();
+
+  if (state.activeTool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = parseInt(document.getElementById('eraserSize').value);
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineWidth = state.brushSize;
+    ctx.strokeStyle = getCurrentColor();
+    // Softness via shadow blur
+    if (state.brushSoftness > 0) {
+      ctx.shadowColor = getCurrentColor();
+      ctx.shadowBlur = state.brushSoftness * 0.4;
+    }
+    // Metallic: add a subtle white highlight on top
+    if (state.metallic) {
+      ctx.shadowBlur = Math.max(ctx.shadowBlur, 8);
+    }
+  }
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+
+  // Metallic sheen pass
+  if (state.activeTool === 'brush' && state.metallic) {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = state.brushSize * 0.35;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y - state.brushSize * 0.15);
+    ctx.lineTo(to.x, to.y - state.brushSize * 0.15);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+canvas.addEventListener('mousedown', startStroke);
+canvas.addEventListener('mousemove', moveStroke);
+window.addEventListener('mouseup', endStroke);
+canvas.addEventListener('touchstart', startStroke);
+canvas.addEventListener('touchmove', moveStroke);
+window.addEventListener('touchend', endStroke);
+
+/* ============================================================
+   HISTORY (undo / redo)
+   ============================================================ */
+function pushHistory() {
+  try {
+    state.history.push(canvas.toDataURL());
+    if (state.history.length > 30) state.history.shift();
+    state.redoStack = [];
+  } catch (e) {}
+}
+
+function undo() {
+  if (state.history.length === 0) {
+    showToast('Nothing to undo');
+    return;
+  }
+  try {
+    state.redoStack.push(canvas.toDataURL());
+  } catch(e) {}
+  const prev = state.history.pop();
+  const img = new Image();
+  img.onload = () => {
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.drawImage(img, 0, 0, rect.width, rect.height);
+  };
+  img.src = prev;
+}
+
+function redo() {
+  if (state.redoStack.length === 0) {
+    showToast('Nothing to redo');
+    return;
+  }
+  try {
+    state.history.push(canvas.toDataURL());
+  } catch(e) {}
+  const next = state.redoStack.pop();
+  const img = new Image();
+  img.onload = () => {
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.drawImage(img, 0, 0, rect.width, rect.height);
+  };
+  img.src = next;
+}
+
+function clearCanvas() {
+  pushHistory();
+  const rect = canvas.getBoundingClientRect();
+  ctx.clearRect(0, 0, rect.width, rect.height);
+}
+
+document.getElementById('undoBtn').addEventListener('click', undo);
+document.getElementById('redoBtn').addEventListener('click', redo);
+document.getElementById('refreshBtn').addEventListener('click', clearCanvas);
+
+/* ============================================================
+   TOOL SELECTION
+   ============================================================ */
+const toolButtons = document.querySelectorAll('.tool-btn');
+const tray = document.getElementById('tray');
+const trayTitle = document.getElementById('trayTitle');
+const panels = {
+  brush: document.getElementById('panel-brush'),
+  eraser: document.getElementById('panel-eraser'),
+  makeup: document.getElementById('panel-makeup'),
+  sticker: document.getElementById('panel-sticker'),
+  pattern: document.getElementById('panel-pattern'),
+  lashes: document.getElementById('panel-lashes'),
+  kitbash: document.getElementById('panel-kitbash'),
+};
+const toolTitles = {
+  brush: 'Paintbrush',
+  eraser: 'Eraser',
+  makeup: 'Makeup',
+  sticker: 'Stickers',
+  pattern: 'Patterns',
+  lashes: 'Eyelash & Eyebrow',
+  kitbash: 'Kitbash',
+};
+const eraserBtn = document.querySelector('[data-tool="eraser"]');
+const patternBtn = document.querySelector('[data-tool="pattern"]');
+const bottomToolbar = document.getElementById('bottomToolbar');
+
+function selectTool(tool, opts = {}) {
+  // Same tool tapped → close
+  if (state.activeTool === tool) {
+    deselectAll();
+    return;
+  }
+
+  // Update conditional visibility based on parent tool
+  if (tool === 'brush') {
+    state.brushSelected = true;
+    state.stickerSelected = false;
+    eraserBtn.classList.add('visible');
+    patternBtn.classList.remove('visible');
+  } else if (tool === 'sticker') {
+    state.stickerSelected = true;
+    state.brushSelected = false;
+    patternBtn.classList.add('visible');
+    eraserBtn.classList.remove('visible');
+  } else if (tool === 'eraser') {
+    // eraser stays visible — brush parent stays selected too (but eraser is the active drawing tool)
+    state.brushSelected = true;
+  } else if (tool === 'pattern') {
+    state.stickerSelected = true;
+  } else {
+    // Other tools (makeup, lashes, addons) — clear conditionals
+    state.brushSelected = false;
+    state.stickerSelected = false;
+    eraserBtn.classList.remove('visible');
+    patternBtn.classList.remove('visible');
+  }
+
+  state.activeTool = tool;
+
+  // Update active button states
+  toolButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tool === tool);
+  });
+  // For brush+eraser: brush stays "secondary highlighted"
+  if (tool === 'eraser') {
+    document.querySelector('[data-tool="brush"]').classList.add('active');
+  }
+  if (tool === 'pattern') {
+    document.querySelector('[data-tool="sticker"]').classList.add('active');
+  }
+
+  // Open tray (no animation if already open, slide in if closed)
+  const wasOpen = tray.classList.contains('open');
+  if (wasOpen) {
+    tray.classList.add('no-anim');
+    setTimeout(() => tray.classList.remove('no-anim'), 50);
+  }
+  tray.classList.add('open');
+  bottomToolbar.classList.add('tray-open');
+
+  // Switch panels
+  Object.values(panels).forEach(p => p.classList.remove('active'));
+  panels[tool].classList.add('active');
+  trayTitle.textContent = toolTitles[tool];
+}
+
+function deselectAll() {
+  state.activeTool = null;
+  state.brushSelected = false;
+  state.stickerSelected = false;
+  toolButtons.forEach(btn => btn.classList.remove('active'));
+  eraserBtn.classList.remove('visible');
+  patternBtn.classList.remove('visible');
+  // Slide tray out (with animation)
+  tray.classList.remove('no-anim');
+  tray.classList.remove('open');
+  bottomToolbar.classList.remove('tray-open');
+}
+
+toolButtons.forEach(btn => {
+  btn.addEventListener('click', () => selectTool(btn.dataset.tool));
+});
+
+document.getElementById('trayCloseBtn').addEventListener('click', deselectAll);
+document.getElementById('trayClearBtn').addEventListener('click', () => {
+  if (state.activeTool === 'brush' || state.activeTool === 'eraser') {
+    clearCanvas();
+    showToast('Cleared');
+  } else {
+    showToast('Cleared ' + (toolTitles[state.activeTool] || 'tray'));
+  }
+});
+
+/* ============================================================
+   TOGGLES
+   ============================================================ */
+document.querySelectorAll('.toggle').forEach(t => {
+  t.addEventListener('click', () => {
+    t.classList.toggle('on');
+    if (t.dataset.toggle === 'metallic') {
+      state.metallic = t.classList.contains('on');
+    }
+  });
+});
+
+/* ============================================================
+   SLIDERS
+   ============================================================ */
+const brushSizeInput = document.getElementById('brushSize');
+const brushSoftInput = document.getElementById('brushSoftness');
+const brushSizePreview = document.getElementById('brushSizePreview');
+const brushSoftPreview = document.getElementById('brushSoftPreview');
+const eraserSizeInput = document.getElementById('eraserSize');
+const eraserSizePreview = document.getElementById('eraserSizePreview');
+
+function updateBrushPreviews() {
+  const size = parseInt(brushSizeInput.value);
+  const soft = parseInt(brushSoftInput.value);
+  state.brushSize = size;
+  state.brushSoftness = soft;
+  // Clamp preview size to fit in 36px box
+  const previewSize = Math.min(28, Math.max(4, size * 0.7));
+  brushSizePreview.style.width = previewSize + 'px';
+  brushSizePreview.style.height = previewSize + 'px';
+  // Softness preview = larger blurry circle
+  const softSize = Math.min(28, 12 + soft * 0.16);
+  brushSoftPreview.style.width = softSize + 'px';
+  brushSoftPreview.style.height = softSize + 'px';
+  brushSoftPreview.style.filter = `blur(${soft * 0.06}px)`;
+  brushSoftPreview.style.background = getCurrentColorHex();
+}
+brushSizeInput.addEventListener('input', updateBrushPreviews);
+brushSoftInput.addEventListener('input', updateBrushPreviews);
+
+eraserSizeInput.addEventListener('input', () => {
+  const size = parseInt(eraserSizeInput.value);
+  const previewSize = Math.min(30, Math.max(6, size * 0.5));
+  eraserSizePreview.style.width = previewSize + 'px';
+  eraserSizePreview.style.height = previewSize + 'px';
+});
+
+/* ============================================================
+   COLOR PICKER (SV box)
+   ============================================================ */
+const svPicker = document.getElementById('svPicker');
+const svThumb = document.getElementById('svThumb');
+
+function updateSvBackground() {
+  const hueRgb = hsvToRgb(state.h, 1, 1);
+  const hueColor = `rgb(${hueRgb[0]},${hueRgb[1]},${hueRgb[2]})`;
+  svPicker.style.background = `
+    linear-gradient(0deg, #000, transparent),
+    linear-gradient(90deg, #fff, ${hueColor})
+  `;
+}
+
+function updateSvThumb() {
+  svThumb.style.left = (state.s * 100) + '%';
+  svThumb.style.top = ((1 - state.v) * 100) + '%';
+  svThumb.style.background = getCurrentColorHex();
+}
+
+function svPick(e) {
+  const rect = svPicker.getBoundingClientRect();
+  const ev = e.touches ? e.touches[0] : e;
+  const x = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+  const y = Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height));
+  state.s = x;
+  state.v = 1 - y;
+  updateSvThumb();
+  updateAlphaGradient();
+  updateBrushPreviews();
+}
+
+let svDragging = false;
+svPicker.addEventListener('mousedown', (e) => { svDragging = true; svPick(e); });
+window.addEventListener('mousemove', (e) => { if (svDragging) svPick(e); });
+window.addEventListener('mouseup', () => { svDragging = false; });
+svPicker.addEventListener('touchstart', (e) => { svDragging = true; svPick(e); });
+window.addEventListener('touchmove', (e) => { if (svDragging) svPick(e); }, { passive: false });
+window.addEventListener('touchend', () => { svDragging = false; });
+
+/* Hue slider */
+const hueSlider = document.getElementById('hueSlider');
+const hueThumb = document.getElementById('hueThumb');
+
+function updateHueThumb() {
+  hueThumb.style.left = (state.h / 360 * 100) + '%';
+}
+
+function huePick(e) {
+  const rect = hueSlider.getBoundingClientRect();
+  const ev = e.touches ? e.touches[0] : e;
+  const x = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+  state.h = x * 360;
+  updateHueThumb();
+  updateSvBackground();
+  updateSvThumb();
+  updateAlphaGradient();
+  updateBrushPreviews();
+}
+
+let hueDragging = false;
+hueSlider.addEventListener('mousedown', (e) => { hueDragging = true; huePick(e); });
+window.addEventListener('mousemove', (e) => { if (hueDragging) huePick(e); });
+window.addEventListener('mouseup', () => { hueDragging = false; });
+hueSlider.addEventListener('touchstart', (e) => { hueDragging = true; huePick(e); });
+window.addEventListener('touchmove', (e) => { if (hueDragging) huePick(e); }, { passive: false });
+window.addEventListener('touchend', () => { hueDragging = false; });
+
+/* Alpha slider */
+const alphaSlider = document.getElementById('alphaSlider');
+const alphaThumb = document.getElementById('alphaThumb');
+const alphaGradient = document.getElementById('alphaGradient');
+
+function updateAlphaGradient() {
+  const hex = getCurrentColorHex();
+  alphaGradient.style.background = `linear-gradient(90deg, transparent, ${hex})`;
+}
+function updateAlphaThumb() {
+  alphaThumb.style.left = (state.a * 100) + '%';
+}
+function alphaPick(e) {
+  const rect = alphaSlider.getBoundingClientRect();
+  const ev = e.touches ? e.touches[0] : e;
+  const x = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+  state.a = x;
+  updateAlphaThumb();
+}
+let alphaDragging = false;
+alphaSlider.addEventListener('mousedown', (e) => { alphaDragging = true; alphaPick(e); });
+window.addEventListener('mousemove', (e) => { if (alphaDragging) alphaPick(e); });
+window.addEventListener('mouseup', () => { alphaDragging = false; });
+alphaSlider.addEventListener('touchstart', (e) => { alphaDragging = true; alphaPick(e); });
+window.addEventListener('touchmove', (e) => { if (alphaDragging) alphaPick(e); }, { passive: false });
+window.addEventListener('touchend', () => { alphaDragging = false; });
+
+/* ============================================================
+   PALETTE
+   ============================================================ */
+const paletteEl = document.getElementById('palette');
+const swatchPopup = document.getElementById('swatchPopup');
+const MAX_SWATCHES = 15; // 15 swatches + 1 add button = 16 cells = 2 rows of 8
+let popupTargetIndex = -1;
+let longPressTimer = null;
+
+function renderPalette() {
+  paletteEl.innerHTML = '';
+  state.palette.forEach((color, i) => {
+    const sw = document.createElement('button');
+    sw.className = 'swatch';
+    sw.style.background = color;
+    sw.dataset.index = i;
+    // Long-press
+    sw.addEventListener('mousedown', (e) => startLongPress(e, i));
+    sw.addEventListener('touchstart', (e) => startLongPress(e, i));
+    sw.addEventListener('mouseup', cancelLongPress);
+    sw.addEventListener('mouseleave', cancelLongPress);
+    sw.addEventListener('touchend', cancelLongPress);
+    sw.addEventListener('click', (e) => {
+      if (longPressFired) { longPressFired = false; e.preventDefault(); return; }
+      pickSwatchColor(color);
+    });
+    paletteEl.appendChild(sw);
+  });
+  if (state.palette.length < MAX_SWATCHES) {
+    const add = document.createElement('button');
+    add.className = 'swatch-add';
+    add.innerHTML = '+';
+    add.title = 'Add current color';
+    add.addEventListener('click', () => {
+      const hex = getCurrentColorHex();
+      if (state.palette.includes(hex)) {
+        showToast('Already in palette');
+        return;
+      }
+      state.palette.push(hex);
+      renderPalette();
+      showToast('Color added');
+    });
+    paletteEl.appendChild(add);
+  }
+}
+
+let longPressFired = false;
+function startLongPress(e, index) {
+  longPressFired = false;
+  longPressTimer = setTimeout(() => {
+    longPressFired = true;
+    showSwatchPopup(e, index);
+  }, 500);
+}
+function cancelLongPress() {
+  clearTimeout(longPressTimer);
+}
+
+function showSwatchPopup(e, index) {
+  popupTargetIndex = index;
+  const ev = e.touches ? e.touches[0] : e;
+  swatchPopup.style.left = (ev.clientX - 30) + 'px';
+  swatchPopup.style.top = (ev.clientY - 40) + 'px';
+  swatchPopup.classList.add('visible');
+}
+document.getElementById('swatchPopupErase').addEventListener('click', () => {
+  state.palette.splice(popupTargetIndex, 1);
+  renderPalette();
+  swatchPopup.classList.remove('visible');
+  showToast('Color removed');
+});
+document.addEventListener('click', (e) => {
+  if (!swatchPopup.contains(e.target) && !e.target.classList.contains('swatch')) {
+    swatchPopup.classList.remove('visible');
+  }
+});
+
+function pickSwatchColor(hex) {
+  // Convert hex to HSV
+  const r = parseInt(hex.slice(1,3), 16) / 255;
+  const g = parseInt(hex.slice(3,5), 16) / 255;
+  const b = parseInt(hex.slice(5,7), 16) / 255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let h = 0, s = 0, v = max;
+  const d = max - min;
+  s = max === 0 ? 0 : d / max;
+  if (max !== min) {
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h *= 60;
+  }
+  state.h = h; state.s = s; state.v = v;
+  updateSvBackground();
+  updateSvThumb();
+  updateHueThumb();
+  updateAlphaGradient();
+  updateBrushPreviews();
+  // Highlight
+  document.querySelectorAll('.swatch').forEach(sw => sw.classList.remove('selected'));
+}
+
+/* ============================================================
+   ROBUX BUTTON
+   ============================================================ */
+document.getElementById('robuxBtn').addEventListener('click', () => {
+  showToast('Payment screen — design coming soon');
+});
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1600);
+}
+
+/* ============================================================
+   TAP-ONLY BUTTONS (top bar opacity feedback already handled by CSS)
+   ============================================================ */
+document.querySelectorAll('[data-action="tap-only"]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    showToast('Demo button — no action wired');
+  });
+});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+updateSvBackground();
+updateSvThumb();
+updateHueThumb();
+updateAlphaGradient();
+updateAlphaThumb();
+updateBrushPreviews();
+renderPalette();
+</script>
+</body>
+</html>
