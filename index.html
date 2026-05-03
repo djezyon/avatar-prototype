@@ -180,6 +180,29 @@ body {
   touch-action: none;
 }
 
+/* Selection marquee overlay — "marching ants" dashed ellipse around the head */
+.selection-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms var(--ease-out);
+  z-index: 5;
+}
+.selection-overlay.visible { opacity: 1; }
+.selection-overlay svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.selection-overlay svg ellipse {
+  filter: drop-shadow(0 0 1px rgba(0,0,0,0.6));
+  animation: marquee-march 0.6s linear infinite;
+}
+@keyframes marquee-march {
+  to { stroke-dashoffset: -3.5; }
+}
+
 /* ============================================================
    TOP BAR — left + right pill buttons
    ============================================================ */
@@ -694,8 +717,16 @@ input[type="range"]::-moz-range-thumb {
 .makeup-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0;
   padding-top: 4px;
+}
+/* Restore spacing between major sections (progress row, empty cards, headings, etc.)
+   but NOT between group cards and their drop zones — those control their own spacing. */
+.makeup-panel > * + * { margin-top: 14px; }
+.makeup-panel > .group-card + .group-drop-zone,
+.makeup-panel > .group-drop-zone + .group-card,
+.makeup-panel > .group-drop-zone + .group-drop-zone {
+  margin-top: 0;
 }
 
 /* Progress preview row */
@@ -796,6 +827,46 @@ input[type="range"]::-moz-range-thumb {
 }
 .btn-blue:hover:not(:disabled) { background: var(--brand-blue-hover); }
 .btn-blue:active:not(:disabled) { transform: scale(0.97); }
+
+/* Subtitle row (replaces progress bar) */
+.makeup-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px 4px 4px;
+}
+.makeup-subtitle {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Accessory row (compact list row) */
+.acc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--divider);
+}
+.acc-row:last-child { border-bottom: none; }
+.acc-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: #5a5d65;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+.acc-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* Section label between cards */
 .section-heading {
@@ -928,13 +999,112 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 8px;
   background: var(--surface-card-2);
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+  user-select: none;
 }
 .layer-row:hover { background: #303239; }
 .layer-row.selected {
   background: var(--brand-blue);
 }
 .layer-row.selected:hover { background: var(--brand-blue-hover); }
+.layer-row[draggable="true"] { cursor: grab; }
+.layer-row.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+/* Drop zone — invisible by default, shows chevron indicator on dragover */
+.drop-zone {
+  height: 14px;
+  margin: -7px 0;
+  position: relative;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.drag-active .drop-zone {
+  pointer-events: auto;
+}
+.drop-zone.over::before {
+  /* Chevron pointing toward the layer that will receive the drop */
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 7px solid var(--text-primary);
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.4));
+}
+/* Top chevron points down (^), bottom chevron points up (v).
+   In our layout, the drop zone above a row should show as a ^ on top of where
+   the layer will land — i.e., a downward-pointing chevron sitting just above. */
+.drop-zone.over.flip-down::before {
+  border-bottom: none;
+  border-top: 7px solid var(--text-primary);
+}
+
+/* While dragging, also show chevrons on the SOURCE row to mirror the screenshot pattern */
+.layer-row.dragging::before,
+.layer-row.dragging::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.5));
+}
+.layer-row.dragging::before {
+  top: -10px;
+  border-bottom: 7px solid var(--text-primary);
+}
+.layer-row.dragging::after {
+  bottom: -10px;
+  border-top: 7px solid var(--text-primary);
+}
+.layer-row.dragging { position: relative; }
+
+/* When drag is active, collapse expanded settings panels so reordering is compact */
+.drag-active .layer-settings,
+.drag-active-group .layer-settings {
+  display: none;
+}
+
+/* Group-level drag (when reordering whole groups) */
+.group-header[draggable="true"] { cursor: grab; }
+.group-header[draggable="true"]:active { cursor: grabbing; }
+.group-card.dragging-group {
+  opacity: 0.4;
+}
+/* Group drop zone — also acts as the visual spacer between group cards.
+   - Idle: 4px tall, gives the requested vertical spacing
+   - Drag-active: 14px tall, expanded to show the chevron drop indicator */
+.group-drop-zone {
+  height: 4px;
+  position: relative;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: height var(--dur-fast) var(--ease-out);
+}
+.drag-active-group .group-drop-zone {
+  height: 14px;
+  pointer-events: auto;
+}
+.group-drop-zone.over::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 7px solid var(--text-primary);
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.4));
+}
 
 .layer-add-tile {
   width: 30px;
@@ -1062,42 +1232,59 @@ input[type="range"]::-moz-range-thumb {
 /* ============================================================
    TOP BAR — tray-aware behavior
    ============================================================ */
-/* Right-side top group shifts left when a creator tray is open,
-   so undo/redo/reset stay over the visible (non-tray) area */
+/* ============================================================
+   TOP BAR — tray-aware behavior
+   ============================================================ */
+/* Right-side top group:
+   - default: visible, no transform
+   - tray-open (creator): shifts left by tray width, AND avatar/exit hide
+   - preview-mode: avatar/exit hide (preview doesn't need them); undo/redo/reset stay
+   - preview-mode + owned-open: shifts left by tray width; undo/redo/reset stay
+*/
 .top-group#topGroupRight {
   transition: transform var(--dur-tray) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+  opacity: 1;
+  pointer-events: auto;
 }
+/* Creator tray open → shift left */
 .phone-screen.tray-open .top-group#topGroupRight {
   transform: translateX(calc(var(--tray-w) * -1));
 }
-/* When preview screen is open, hide the creator's top-right pill entirely */
-.phone-screen.preview-mode .top-group#topGroupRight {
-  opacity: 0;
-  pointer-events: none;
+/* Preview owned-open → shift left (same as tray-open) */
+.phone-screen.preview-mode.owned-mode .top-group#topGroupRight {
+  transform: translateX(calc(var(--tray-w) * -1));
 }
-/* Robux button also hides when preview is open */
+/* Robux button hides during preview */
 .phone-screen.preview-mode .robux-btn {
   opacity: 0;
   pointer-events: none;
 }
-/* And the bottom toolbar — preview has its own tab bar */
+/* Bottom toolbar hides during preview (preview has its own tab bar) */
 .phone-screen.preview-mode .bottom-toolbar {
   opacity: 0;
   pointer-events: none;
 }
-/* Buttons hidden when a tray is open (avatar, exit) */
+
+/* Buttons that hide when a creator tray is open OR when preview is open (avatar, exit) */
 .icon-btn.tray-hide {
+  display: flex;
+  opacity: 1;
+  width: 36px;
+  margin: 0;
+  pointer-events: auto;
+  overflow: hidden;
   transition: opacity var(--dur-fast) var(--ease-out),
               width var(--dur-tray) var(--ease-out),
-              margin var(--dur-tray) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out);
+              margin-left var(--dur-tray) var(--ease-out),
+              margin-right var(--dur-tray) var(--ease-out);
 }
-.phone-screen.tray-open .icon-btn.tray-hide {
+.phone-screen.tray-open .icon-btn.tray-hide,
+.phone-screen.preview-mode .icon-btn.tray-hide {
   opacity: 0;
   width: 0;
-  margin: 0;
+  margin-left: 0;
+  margin-right: 0;
   pointer-events: none;
-  overflow: hidden;
 }
 
 /* ============================================================
@@ -1361,6 +1548,105 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ============================================================
+   KEBAB DROPDOWN (layer/group menu)
+   ============================================================ */
+.kebab-menu {
+  position: fixed;
+  z-index: 320;
+  background: var(--surface-card);
+  border-radius: 14px;
+  border: 1px solid rgba(208, 217, 251, 0.12);
+  padding: 8px;
+  width: 200px;
+  box-shadow:
+    0 2px 4px rgba(4, 4, 8, 0.25),
+    0 10px 20px rgba(4, 4, 8, 0.25),
+    0 16px 32px rgba(4, 4, 8, 0.25),
+    0 48px 56px rgba(4, 4, 8, 0.25);
+  display: none;
+  opacity: 0;
+  transform: scale(0.96);
+  transform-origin: top left;
+  transition: opacity 140ms var(--ease-out), transform 140ms var(--ease-out);
+}
+.kebab-menu.visible {
+  display: block;
+  opacity: 1;
+  transform: scale(1);
+}
+.kebab-menu .kebab-item {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+  color: var(--text-primary);
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+.kebab-menu .kebab-item:hover { background: rgba(255,255,255,0.06); }
+.kebab-menu .kebab-item.focused {
+  background: var(--brand-blue);
+}
+.kebab-menu .kebab-item.focused:hover { background: var(--brand-blue-hover); }
+.kebab-menu .kebab-item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.kebab-menu .kebab-item:disabled:hover { background: transparent; }
+
+/* ============================================================
+   UNDO SNACKBAR (white, with action button)
+   ============================================================ */
+.undo-snackbar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #ffffff;
+  color: #1a1a1a;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 280px;
+  max-width: 90%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+  z-index: 220;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.undo-snackbar.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+.undo-snackbar .undo-msg { flex: 1; color: #1a1a1a; }
+.undo-snackbar .undo-action {
+  background: transparent;
+  border: none;
+  color: var(--brand-blue);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  padding: 4px 8px;
+  margin: -4px -8px -4px 0;
+  border-radius: 6px;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.undo-snackbar .undo-action:hover { background: rgba(51, 95, 255, 0.1); }
+
+/* ============================================================
    TOAST
    ============================================================ */
 .toast {
@@ -1410,6 +1696,14 @@ input[type="range"]::-moz-range-thumb {
     <div class="stage">
       <!-- Drawable canvas — clipped to head -->
       <canvas class="draw-canvas" id="drawCanvas"></canvas>
+      <!-- Marquee selection overlay (shown on Select action) -->
+      <div class="selection-overlay" id="selectionOverlay" aria-hidden="true">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+          <ellipse cx="50" cy="42" rx="11" ry="34"
+                   fill="none" stroke="#ffffff" stroke-width="0.5"
+                   stroke-dasharray="2 1.5" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
     </div>
 
     <!-- DYNAMIC ISLAND (left in landscape) -->
@@ -1438,7 +1732,7 @@ input[type="range"]::-moz-range-thumb {
         <button class="icon-btn tray-hide" id="avatarBtn" aria-label="Avatar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
         </button>
-        <button class="icon-btn tray-hide" aria-label="Exit">
+        <button class="icon-btn" aria-label="Exit">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H5v14h4"/><path d="M14 9l5 3-5 3"/><path d="M19 12H9"/></svg>
         </button>
       </div>
@@ -1715,6 +2009,15 @@ input[type="range"]::-moz-range-thumb {
       <button id="swatchPopupErase">Erase</button>
     </div>
 
+    <!-- KEBAB DROPDOWN (layer/group menu) -->
+    <div class="kebab-menu" id="kebabMenu" role="menu"></div>
+
+    <!-- UNDO SNACKBAR -->
+    <div class="undo-snackbar" id="undoSnackbar">
+      <div class="undo-msg" id="undoSnackbarMsg"></div>
+      <button class="undo-action" id="undoSnackbarBtn">Undo</button>
+    </div>
+
     <!-- TOAST -->
     <div class="toast" id="toast"></div>
   </div>
@@ -1743,11 +2046,12 @@ const state = {
   redoStack: [],
   // ---------- Makeup state ----------
   makeup: {
-    groups: [],       // [{ id, type, name, opacity (0-100), visible, expanded, selectedLayerId, layers: [{ id, name, showGuides, applyMask, visible }] }]
+    groups: [],       // [{ id, type, name, opacity (0-100), visible, expanded, selectedLayerId, layers: [{ id, name, showGuides, applyMask, visible, alphaLocked }] }]
     accessories: [],  // [{ id, type, name, visible }]
     selectedLayerRef: null, // { groupId, layerId }
     nextGroupNum: { face: 1, eye: 1, lips: 1 },
     nextLayerNum: 1,
+    clipboardLayer: null, // copy/paste buffer
   },
 };
 
@@ -1759,8 +2063,8 @@ const MAKEUP_GROUP_TYPES = {
   lips:  { label: 'Lips Group', basePrice: 45 },
 };
 const MAKEUP_ACCESSORY_TYPES = {
-  eyelash: { label: 'Eyelash' },
-  eyebrow: { label: 'Eyebrow' },
+  eyelash: { label: 'Eyelashes', basePrice: 90 },
+  eyebrow: { label: 'Eyebrows', basePrice: 90 },
 };
 // Inline SVG markup for popup icons (placeholder; replace with PNGs later)
 const MENU_ICONS = {
@@ -1899,12 +2203,16 @@ function drawSegment(from, to) {
   ctx.ellipse(rect.width * 0.5, rect.height * 0.42, rect.width * 0.11, rect.height * 0.34, 0, 0, Math.PI*2);
   ctx.clip();
 
+  // Check if the active layer has alpha lock enabled
+  const alphaLockOn = isCurrentLayerAlphaLocked();
+
   if (state.activeTool === 'eraser') {
     ctx.globalCompositeOperation = 'destination-out';
     ctx.lineWidth = parseInt(document.getElementById('eraserSize').value);
     ctx.strokeStyle = 'rgba(0,0,0,1)';
   } else {
-    ctx.globalCompositeOperation = 'source-over';
+    // Alpha Lock: source-atop only paints where pixels already exist
+    ctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
     ctx.lineWidth = state.brushSize;
     ctx.strokeStyle = getCurrentColor();
     // Softness via shadow blur
@@ -1926,7 +2234,7 @@ function drawSegment(from, to) {
 
   // Metallic sheen pass
   if (state.activeTool === 'brush' && state.metallic) {
-    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.lineWidth = state.brushSize * 0.35;
     ctx.shadowBlur = 0;
@@ -1936,6 +2244,14 @@ function drawSegment(from, to) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+function isCurrentLayerAlphaLocked() {
+  const ref = state.makeup.selectedLayerRef;
+  if (!ref) return false;
+  const g = state.makeup.groups.find(x => x.id === ref.groupId);
+  const l = g && g.layers.find(x => x.id === ref.layerId);
+  return !!(l && l.alphaLocked);
 }
 
 canvas.addEventListener('mousedown', startStroke);
@@ -1950,7 +2266,22 @@ window.addEventListener('touchend', endStroke);
    ============================================================ */
 function pushHistory() {
   try {
-    state.history.push(canvas.toDataURL());
+    state.history.push({ kind: 'canvas', data: canvas.toDataURL() });
+    if (state.history.length > 30) state.history.shift();
+    state.redoStack = [];
+  } catch (e) {}
+}
+
+// Snapshot the makeup panel data (groups + accessories + selection) for undo.
+// Used by reorder operations.
+function pushMakeupHistory() {
+  try {
+    const snap = JSON.parse(JSON.stringify({
+      groups: state.makeup.groups,
+      accessories: state.makeup.accessories,
+      selectedLayerRef: state.makeup.selectedLayerRef,
+    }));
+    state.history.push({ kind: 'makeup', data: snap });
     if (state.history.length > 30) state.history.shift();
     state.redoStack = [];
   } catch (e) {}
@@ -1961,17 +2292,32 @@ function undo() {
     showToast('Nothing to undo');
     return;
   }
-  try {
-    state.redoStack.push(canvas.toDataURL());
-  } catch(e) {}
-  const prev = state.history.pop();
-  const img = new Image();
-  img.onload = () => {
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    ctx.drawImage(img, 0, 0, rect.width, rect.height);
-  };
-  img.src = prev;
+  const entry = state.history.pop();
+  // Snapshot current state into redo stack so we can come back
+  if (entry.kind === 'canvas') {
+    try { state.redoStack.push({ kind: 'canvas', data: canvas.toDataURL() }); } catch(e) {}
+    const img = new Image();
+    img.onload = () => {
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+    };
+    img.src = entry.data;
+  } else if (entry.kind === 'makeup') {
+    // Snapshot current makeup state into redo
+    state.redoStack.push({
+      kind: 'makeup',
+      data: JSON.parse(JSON.stringify({
+        groups: state.makeup.groups,
+        accessories: state.makeup.accessories,
+        selectedLayerRef: state.makeup.selectedLayerRef,
+      })),
+    });
+    state.makeup.groups = entry.data.groups;
+    state.makeup.accessories = entry.data.accessories;
+    state.makeup.selectedLayerRef = entry.data.selectedLayerRef;
+    if (typeof renderMakeupPanel === 'function') renderMakeupPanel();
+  }
 }
 
 function redo() {
@@ -1979,17 +2325,30 @@ function redo() {
     showToast('Nothing to redo');
     return;
   }
-  try {
-    state.history.push(canvas.toDataURL());
-  } catch(e) {}
-  const next = state.redoStack.pop();
-  const img = new Image();
-  img.onload = () => {
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    ctx.drawImage(img, 0, 0, rect.width, rect.height);
-  };
-  img.src = next;
+  const entry = state.redoStack.pop();
+  if (entry.kind === 'canvas') {
+    try { state.history.push({ kind: 'canvas', data: canvas.toDataURL() }); } catch(e) {}
+    const img = new Image();
+    img.onload = () => {
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+    };
+    img.src = entry.data;
+  } else if (entry.kind === 'makeup') {
+    state.history.push({
+      kind: 'makeup',
+      data: JSON.parse(JSON.stringify({
+        groups: state.makeup.groups,
+        accessories: state.makeup.accessories,
+        selectedLayerRef: state.makeup.selectedLayerRef,
+      })),
+    });
+    state.makeup.groups = entry.data.groups;
+    state.makeup.accessories = entry.data.accessories;
+    state.makeup.selectedLayerRef = entry.data.selectedLayerRef;
+    if (typeof renderMakeupPanel === 'function') renderMakeupPanel();
+  }
 }
 
 function clearCanvas() {
@@ -2416,7 +2775,7 @@ function renderMakeupPanel() {
 
   let html = '';
 
-  // Progress row — always shown
+  // Progress row — thin pill bar + "X/6 Layers Applied" label + "+" button
   const pct = (groupCount / MAKEUP_MAX_GROUPS) * 100;
   html += `
     <div class="progress-row">
@@ -2443,10 +2802,13 @@ function renderMakeupPanel() {
       </div>
     `;
   } else {
-    groups.forEach(g => {
+    groups.forEach((g, gi) => {
+      // Drop zone ABOVE this group (insert at index gi)
+      html += `<div class="group-drop-zone" data-group-drop-index="${gi}"></div>`;
       html += renderGroupCard(g);
     });
-    // If under cap, no additional CTA — user uses the + button at top
+    // Drop zone AFTER the last group
+    html += `<div class="group-drop-zone" data-group-drop-index="${groups.length}"></div>`;
   }
 
   // Face Accessories section
@@ -2465,12 +2827,9 @@ function renderMakeupPanel() {
       </div>
     `;
   } else {
-    // Render accessory chips/cards (simple for v1)
     accs.forEach(a => {
       html += renderAccessoryRow(a);
     });
-    // No "Add Accessory" CTA here — once any accessory exists,
-    // users add more via the top "+" button (which handles filtering).
   }
 
   makeupPanelEl.innerHTML = html;
@@ -2483,12 +2842,14 @@ function renderGroupCard(g) {
   const chevronRotate = g.expanded ? '180deg' : '0deg';
   let body = '';
   if (g.expanded) {
-    g.layers.forEach(l => {
+    g.layers.forEach((l, layerIdx) => {
       const sel = (state.makeup.selectedLayerRef &&
                    state.makeup.selectedLayerRef.groupId === g.id &&
                    state.makeup.selectedLayerRef.layerId === l.id);
+      // Drop zone ABOVE this layer (insert at layerIdx)
+      body += `<div class="drop-zone" data-drop-group="${g.id}" data-drop-index="${layerIdx}"></div>`;
       body += `
-        <div class="layer-row ${sel ? 'selected' : ''}" data-group-id="${g.id}" data-layer-id="${l.id}">
+        <div class="layer-row ${sel ? 'selected' : ''}" data-group-id="${g.id}" data-layer-id="${l.id}" draggable="true">
           <button class="layer-add-tile" data-action="layer-add" data-group-id="${g.id}" data-layer-id="${l.id}" aria-label="Add layer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           </button>
@@ -2520,10 +2881,12 @@ function renderGroupCard(g) {
         `;
       }
     });
+    // Drop zone AFTER the last layer (insert at end)
+    body += `<div class="drop-zone" data-drop-group="${g.id}" data-drop-index="${g.layers.length}"></div>`;
   }
   return `
     <div class="group-card" data-group-id="${g.id}">
-      <div class="group-header" data-action="group-toggle" data-group-id="${g.id}">
+      <div class="group-header" data-action="group-toggle" data-group-id="${g.id}" draggable="true">
         <div class="group-thumb"></div>
         <div class="group-name">${escapeHtml(g.name)}</div>
         <img class="group-chip" src="./assets/chips/Property_1_${g.type === 'face' ? 'Face' : g.type === 'eye' ? 'Eyes' : 'Lips'}.svg" alt="${meta.label}">
@@ -2547,16 +2910,19 @@ function renderGroupCard(g) {
 }
 
 function renderAccessoryRow(a) {
+  const meta = MAKEUP_ACCESSORY_TYPES[a.type];
   return `
-    <div class="group-card" data-acc-id="${a.id}">
-      <div class="group-header">
-        <div class="group-thumb"></div>
-        <div class="group-name">${escapeHtml(a.name)}</div>
-        <div class="checkbox ${a.visible ? 'checked' : ''}" data-action="acc-vis" data-acc-id="${a.id}"></div>
-        <button class="group-action" data-action="acc-menu" data-acc-id="${a.id}" aria-label="Options">
-          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
-        </button>
+    <div class="acc-row" data-acc-id="${a.id}">
+      <div class="acc-thumb"></div>
+      <div class="acc-name">${escapeHtml(a.name)}</div>
+      <div class="cost-pill" data-action="acc-cost" data-acc-id="${a.id}">
+        <span class="cost-hex"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L21 7v10l-9 5-9-5V7z"/></svg></span>
+        <span>${meta.basePrice}</span>
       </div>
+      <div class="checkbox ${a.visible ? 'checked' : ''}" data-action="acc-vis" data-acc-id="${a.id}"></div>
+      <button class="group-action" data-action="acc-menu" data-acc-id="${a.id}" aria-label="Options">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+      </button>
     </div>
   `;
 }
@@ -2613,7 +2979,7 @@ function attachMakeupHandlers() {
     if (action === 'group-menu') {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        showToast('Group options — coming next');
+        openKebabMenu(el, { kind: 'group', groupId });
       });
     }
 
@@ -2639,7 +3005,7 @@ function attachMakeupHandlers() {
     if (action === 'layer-menu') {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        showToast('Layer options — coming next');
+        openKebabMenu(el, { kind: 'layer', groupId, layerId });
       });
     }
     if (action === 'layer-guides') {
@@ -2668,7 +3034,13 @@ function attachMakeupHandlers() {
     if (action === 'acc-menu') {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        showToast('Accessory options — coming next');
+        openKebabMenu(el, { kind: 'accessory', accId });
+      });
+    }
+    if (action === 'acc-cost') {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showToast('Cost details — coming next');
       });
     }
   });
@@ -2693,6 +3065,185 @@ function attachMakeupHandlers() {
       if (g) g.opacity = parseInt(slider.value);
     });
   });
+
+  // Drag-and-drop layer reordering
+  attachLayerDragHandlers();
+}
+
+/* ============================================================
+   LAYER & GROUP DRAG-AND-DROP REORDERING
+   ============================================================ */
+let dragState = null;
+// dragState is one of:
+//   { kind: 'layer',   groupId, layerId }
+//   { kind: 'group',   groupId }
+
+function attachLayerDragHandlers() {
+  // ----- LAYER DRAG -----
+  const rows = makeupPanelEl.querySelectorAll('.layer-row');
+  rows.forEach(row => {
+    row.addEventListener('dragstart', (e) => {
+      // Don't trigger when dragstart originates from inside an action button
+      if (e.target.closest('[data-action]')) {
+        e.preventDefault();
+        return;
+      }
+      e.stopPropagation();
+      dragState = {
+        kind: 'layer',
+        groupId: row.dataset.groupId,
+        layerId: row.dataset.layerId,
+      };
+      row.classList.add('dragging');
+      makeupPanelEl.classList.add('drag-active');
+      // Mark the source group as the only valid drop area
+      const srcGroupCard = makeupPanelEl.querySelector(`.group-card[data-group-id="${dragState.groupId}"]`);
+      if (srcGroupCard) srcGroupCard.classList.add('drag-target-group');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', dragState.layerId); } catch (_) {}
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      makeupPanelEl.classList.remove('drag-active');
+      makeupPanelEl.querySelectorAll('.drop-zone.over').forEach(z => z.classList.remove('over'));
+      makeupPanelEl.querySelectorAll('.drag-target-group').forEach(g => g.classList.remove('drag-target-group'));
+      dragState = null;
+    });
+  });
+
+  // Layer drop zones — only accept drops from the SAME group
+  const layerZones = makeupPanelEl.querySelectorAll('.drop-zone');
+  layerZones.forEach(zone => {
+    zone.addEventListener('dragover', (e) => {
+      if (!dragState || dragState.kind !== 'layer') return;
+      // Only allow drop within the source group
+      if (zone.dataset.dropGroup !== dragState.groupId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      makeupPanelEl.querySelectorAll('.drop-zone.over').forEach(z => z.classList.remove('over'));
+      zone.classList.add('over');
+    });
+    zone.addEventListener('dragleave', () => {
+      zone.classList.remove('over');
+    });
+    zone.addEventListener('drop', (e) => {
+      if (!dragState || dragState.kind !== 'layer') return;
+      if (zone.dataset.dropGroup !== dragState.groupId) return;
+      e.preventDefault();
+      const targetGroupId = zone.dataset.dropGroup;
+      const targetIndex = parseInt(zone.dataset.dropIndex);
+      moveLayer(dragState.groupId, dragState.layerId, targetGroupId, targetIndex);
+      zone.classList.remove('over');
+    });
+  });
+
+  // ----- GROUP DRAG -----
+  // Drag is initiated from the group HEADER (not the full card) to avoid
+  // conflict with layer rows inside the body, which have their own draggability.
+  const groupHeaders = makeupPanelEl.querySelectorAll('.group-header');
+  groupHeaders.forEach(header => {
+    const card = header.closest('.group-card');
+    if (!card) return;
+    header.addEventListener('dragstart', (e) => {
+      // Prevent drag if user grabbed an actual button/control inside the header
+      // (kebab, checkbox, cost pill). Allow drag from thumb, name, chip, or empty space.
+      if (e.target.closest('button, .checkbox')) {
+        e.preventDefault();
+        return;
+      }
+      e.stopPropagation();
+      dragState = {
+        kind: 'group',
+        groupId: card.dataset.groupId,
+      };
+      card.classList.add('dragging-group');
+      makeupPanelEl.classList.add('drag-active-group');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', dragState.groupId); } catch (_) {}
+    });
+    header.addEventListener('dragend', () => {
+      card.classList.remove('dragging-group');
+      makeupPanelEl.classList.remove('drag-active-group');
+      makeupPanelEl.querySelectorAll('.group-drop-zone.over').forEach(z => z.classList.remove('over'));
+      dragState = null;
+    });
+  });
+
+  // Group drop zones
+  const groupZones = makeupPanelEl.querySelectorAll('.group-drop-zone');
+  groupZones.forEach(zone => {
+    zone.addEventListener('dragover', (e) => {
+      if (!dragState || dragState.kind !== 'group') return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      makeupPanelEl.querySelectorAll('.group-drop-zone.over').forEach(z => z.classList.remove('over'));
+      zone.classList.add('over');
+    });
+    zone.addEventListener('dragleave', () => {
+      zone.classList.remove('over');
+    });
+    zone.addEventListener('drop', (e) => {
+      if (!dragState || dragState.kind !== 'group') return;
+      e.preventDefault();
+      const targetIndex = parseInt(zone.dataset.groupDropIndex);
+      moveGroup(dragState.groupId, targetIndex);
+      zone.classList.remove('over');
+    });
+  });
+}
+
+function moveLayer(srcGroupId, srcLayerId, targetGroupId, targetIndex) {
+  // Per spec: layers only reorder WITHIN the same group.
+  // Cross-group movement is not allowed for layers — that's what group reorder is for.
+  if (srcGroupId !== targetGroupId) {
+    showToast('Layers stay in their group');
+    return;
+  }
+
+  const srcGroup = state.makeup.groups.find(g => g.id === srcGroupId);
+  if (!srcGroup) return;
+
+  const srcIdx = srcGroup.layers.findIndex(l => l.id === srcLayerId);
+  if (srcIdx < 0) return;
+  const layer = srcGroup.layers[srcIdx];
+
+  // No-op if dropping at same position
+  if (targetIndex === srcIdx || targetIndex === srcIdx + 1) {
+    return;
+  }
+
+  // Snapshot for undo (use top-toolbar history)
+  pushMakeupHistory();
+
+  // Remove from source, then insert at target (adjust if needed)
+  srcGroup.layers.splice(srcIdx, 1);
+  let insertIdx = targetIndex;
+  if (srcIdx < targetIndex) insertIdx = targetIndex - 1;
+  insertIdx = Math.max(0, Math.min(insertIdx, srcGroup.layers.length));
+  srcGroup.layers.splice(insertIdx, 0, layer);
+
+  state.makeup.selectedLayerRef = { groupId: srcGroup.id, layerId: layer.id };
+  renderMakeupPanel();
+  showToast(`Reordered ${layer.name}`);
+}
+
+function moveGroup(srcGroupId, targetIndex) {
+  const srcIdx = state.makeup.groups.findIndex(g => g.id === srcGroupId);
+  if (srcIdx < 0) return;
+  // No-op if dropping at same position
+  if (targetIndex === srcIdx || targetIndex === srcIdx + 1) return;
+
+  pushMakeupHistory();
+
+  const group = state.makeup.groups[srcIdx];
+  state.makeup.groups.splice(srcIdx, 1);
+  let insertIdx = targetIndex;
+  if (srcIdx < targetIndex) insertIdx = targetIndex - 1;
+  insertIdx = Math.max(0, Math.min(insertIdx, state.makeup.groups.length));
+  state.makeup.groups.splice(insertIdx, 0, group);
+
+  renderMakeupPanel();
+  showToast(`Reordered ${group.name}`);
 }
 
 /* ============================================================
@@ -2840,7 +3391,7 @@ function addMakeupGroup(type) {
     visible: true,
     expanded: true,
     layers: [
-      { id: layerId, name: `Layer ${layerNum}`, showGuides: true, applyMask: false, visible: true }
+      { id: layerId, name: `Layer ${layerNum}`, showGuides: true, applyMask: false, visible: true, alphaLocked: false }
     ]
   });
   state.makeup.selectedLayerRef = { groupId, layerId };
@@ -2856,6 +3407,417 @@ function addAccessory(type) {
   });
   renderMakeupPanel();
   showToast(`Added ${meta.label}`);
+}
+
+/* ============================================================
+   KEBAB MENU (group / layer / accessory contextual menu)
+   ============================================================ */
+const kebabMenu = document.getElementById('kebabMenu');
+let kebabContext = null; // { kind, groupId, layerId?, accId? }
+
+const KEBAB_ITEMS = [
+  { id: 'add',       label: 'Add Layer',     focused: true },
+  { id: 'copy',      label: 'Copy' },
+  { id: 'duplicate', label: 'Duplicate' },
+  { id: 'select',    label: 'Select' },
+  { id: 'fill',      label: 'Fill Layer' },
+  { id: 'clear',     label: 'Clear' },
+  { id: 'alpha',     label: 'Alpha Lock' },
+  { id: 'remove',    label: 'Remove Layer' },
+  { id: 'merge',     label: 'Merge Down' },
+];
+
+function openKebabMenu(anchorEl, ctx) {
+  kebabContext = ctx;
+
+  // Determine state-dependent enabling/labels
+  let alphaLocked = false;
+  let canMergeDown = false;
+  if (ctx.kind === 'layer') {
+    const g = state.makeup.groups.find(x => x.id === ctx.groupId);
+    const l = g && g.layers.find(x => x.id === ctx.layerId);
+    if (l) alphaLocked = !!l.alphaLocked;
+    if (g && l) {
+      const idx = g.layers.findIndex(x => x.id === l.id);
+      // Layers are top-down in the array, so "below" = idx+1
+      canMergeDown = (idx >= 0 && idx < g.layers.length - 1);
+    }
+  } else if (ctx.kind === 'group') {
+    canMergeDown = false; // groups don't merge down
+  } else if (ctx.kind === 'accessory') {
+    canMergeDown = false;
+  }
+
+  // Render items — disable some based on context
+  let html = '';
+  KEBAB_ITEMS.forEach(it => {
+    let disabled = false;
+    let suffix = '';
+    if (it.id === 'merge' && !canMergeDown) disabled = true;
+    if (it.id === 'alpha' && alphaLocked) suffix = ' ✓';
+    // For accessories, hide layer-specific items
+    if (ctx.kind === 'accessory' && ['add','copy','duplicate','select','fill','clear','alpha','merge'].includes(it.id)) {
+      disabled = true;
+    }
+    html += `<button class="kebab-item ${it.focused ? 'focused' : ''}" data-kebab-id="${it.id}" ${disabled ? 'disabled' : ''}>${it.label}${suffix}</button>`;
+  });
+  kebabMenu.innerHTML = html;
+
+  // Position the popup near the anchor — to the LEFT of the kebab button
+  const r = anchorEl.getBoundingClientRect();
+  kebabMenu.style.visibility = 'hidden';
+  kebabMenu.classList.add('visible');
+  const pw = kebabMenu.offsetWidth;
+  const ph = kebabMenu.offsetHeight;
+
+  let left = r.left - pw - 4;
+  let top = r.top;
+
+  if (top + ph > window.innerHeight - 12) {
+    top = window.innerHeight - ph - 12;
+  }
+  if (top < 12) top = 12;
+
+  if (left < 12) {
+    left = r.right + 4;
+    kebabMenu.style.transformOrigin = 'top right';
+  } else {
+    kebabMenu.style.transformOrigin = 'top left';
+  }
+
+  kebabMenu.style.left = left + 'px';
+  kebabMenu.style.top = top + 'px';
+  kebabMenu.style.visibility = '';
+
+  kebabMenu.querySelectorAll('.kebab-item').forEach(it => {
+    it.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (it.disabled) return;
+      onKebabPick(it.dataset.kebabId);
+    });
+    it.addEventListener('mouseenter', () => {
+      if (it.disabled) return;
+      kebabMenu.querySelectorAll('.kebab-item').forEach(x => x.classList.remove('focused'));
+      it.classList.add('focused');
+    });
+  });
+}
+
+function closeKebabMenu() {
+  kebabMenu.classList.remove('visible');
+  kebabContext = null;
+}
+
+// Click outside or ESC closes
+document.addEventListener('click', (e) => {
+  if (kebabMenu.classList.contains('visible') &&
+      !kebabMenu.contains(e.target)) {
+    closeKebabMenu();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && kebabMenu.classList.contains('visible')) {
+    closeKebabMenu();
+  }
+});
+
+function onKebabPick(itemId) {
+  const ctx = kebabContext;
+  closeKebabMenu();
+  if (!ctx) return;
+
+  switch (itemId) {
+    case 'add':       doAddLayer(ctx); break;
+    case 'copy':      doCopyLayer(ctx); break;
+    case 'duplicate': doDuplicateLayer(ctx); break;
+    case 'select':    doSelectLayer(ctx); break;
+    case 'fill':      doFillLayer(ctx); break;
+    case 'clear':     doClearLayer(ctx); break;
+    case 'alpha':     doToggleAlphaLock(ctx); break;
+    case 'remove':    doRemoveLayer(ctx); break;
+    case 'merge':     doMergeDown(ctx); break;
+  }
+}
+
+/* ============================================================
+   COPY / DUPLICATE / SELECT
+   ============================================================ */
+function doCopyLayer(ctx) {
+  // Per spec: Copy = Duplicate within the same group (Layer N → Layer N copy)
+  doDuplicateLayer(ctx);
+}
+
+function doDuplicateLayer(ctx) {
+  if (ctx.kind !== 'layer') {
+    showToast('Select a layer to duplicate');
+    return;
+  }
+  const g = state.makeup.groups.find(x => x.id === ctx.groupId);
+  if (!g) return;
+  const idx = g.layers.findIndex(x => x.id === ctx.layerId);
+  if (idx < 0) return;
+  const orig = g.layers[idx];
+  const newId = `l_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+  const copy = {
+    ...orig,
+    id: newId,
+    name: `${orig.name} copy`,
+  };
+  // Place directly above the original (i.e. one position earlier in array)
+  g.layers.splice(idx, 0, copy);
+  state.makeup.selectedLayerRef = { groupId: g.id, layerId: newId };
+  renderMakeupPanel();
+  showToast(`Duplicated ${orig.name}`);
+}
+
+function doSelectLayer(ctx) {
+  if (ctx.kind !== 'layer') return;
+  // Also select the layer for editing (so the settings panel shows)
+  state.makeup.selectedLayerRef = { groupId: ctx.groupId, layerId: ctx.layerId };
+  const g = state.makeup.groups.find(x => x.id === ctx.groupId);
+  if (g) g.expanded = true;
+  renderMakeupPanel();
+  // And show the marquee on the canvas
+  showSelectionMarquee();
+  showToast('Selection active');
+}
+
+let marqueeTimer = null;
+function showSelectionMarquee() {
+  const overlay = document.getElementById('selectionOverlay');
+  if (!overlay) return;
+  overlay.classList.add('visible');
+  // Auto-hide after 4 seconds (so it doesn't stay forever)
+  if (marqueeTimer) clearTimeout(marqueeTimer);
+  marqueeTimer = setTimeout(() => {
+    overlay.classList.remove('visible');
+  }, 4000);
+}
+
+/* ============================================================
+   FILL / CLEAR / ALPHA LOCK / MERGE DOWN
+   ============================================================ */
+function doFillLayer(kctx) {
+  if (kctx.kind !== 'layer') {
+    showToast('Select a layer to fill');
+    return;
+  }
+  const g = state.makeup.groups.find(x => x.id === kctx.groupId);
+  const l = g && g.layers.find(x => x.id === kctx.layerId);
+  if (!l) return;
+  // Push to canvas history (for undo via the top toolbar)
+  pushHistory();
+  // Fill the head ellipse with the current brush color
+  fillHeadAreaWithCurrentColor();
+  showToast(`Filled ${l.name}`);
+}
+
+function fillHeadAreaWithCurrentColor() {
+  const rect = canvas.getBoundingClientRect();
+  const ctxx = canvas.getContext('2d');
+  ctxx.save();
+  // Clip to head ellipse
+  ctxx.beginPath();
+  ctxx.ellipse(rect.width * 0.5, rect.height * 0.42,
+               rect.width * 0.11, rect.height * 0.34, 0, 0, Math.PI * 2);
+  ctxx.clip();
+  ctxx.fillStyle = getCurrentColor();
+  ctxx.fillRect(0, 0, rect.width, rect.height);
+  ctxx.restore();
+}
+
+function doClearLayer(kctx) {
+  if (kctx.kind !== 'layer') {
+    showToast('Select a layer to clear');
+    return;
+  }
+  const g = state.makeup.groups.find(x => x.id === kctx.groupId);
+  const l = g && g.layers.find(x => x.id === kctx.layerId);
+  if (!l) return;
+  // Push history snapshot, then clear
+  pushHistory();
+  const rect = canvas.getBoundingClientRect();
+  const ctxx = canvas.getContext('2d');
+  ctxx.clearRect(0, 0, rect.width, rect.height);
+  showToast(`Cleared ${l.name}`);
+}
+
+function doToggleAlphaLock(kctx) {
+  if (kctx.kind !== 'layer') {
+    showToast('Alpha Lock applies to layers');
+    return;
+  }
+  const g = state.makeup.groups.find(x => x.id === kctx.groupId);
+  const l = g && g.layers.find(x => x.id === kctx.layerId);
+  if (!l) return;
+  l.alphaLocked = !l.alphaLocked;
+  renderMakeupPanel();
+  showToast(l.alphaLocked ? `${l.name}: Alpha Lock ON` : `${l.name}: Alpha Lock OFF`);
+}
+
+function doMergeDown(kctx) {
+  if (kctx.kind !== 'layer') {
+    showToast('Merge Down only works on layers');
+    return;
+  }
+  const g = state.makeup.groups.find(x => x.id === kctx.groupId);
+  if (!g) return;
+  const idx = g.layers.findIndex(x => x.id === kctx.layerId);
+  if (idx < 0) return;
+  // The layer "below" is at idx+1 (since array is top-down)
+  if (idx >= g.layers.length - 1) {
+    showToast('No layer below to merge with');
+    return;
+  }
+  const top = g.layers[idx];
+  const below = g.layers[idx + 1];
+  // Keep the bottom layer's name but mark it as merged
+  // Both layers get removed and a single merged one inserted
+  const merged = {
+    ...below,
+    id: below.id, // preserve id so undo state is fine
+    name: below.name,
+    // Visibility: merged layer visible if either was visible
+    visible: top.visible || below.visible,
+    // Keep the bottom layer's other settings
+  };
+  g.layers.splice(idx, 2, merged); // remove top + below, insert merged at idx
+  state.makeup.selectedLayerRef = { groupId: g.id, layerId: merged.id };
+  renderMakeupPanel();
+  showToast(`Merged into ${merged.name}`);
+}
+
+/* ============================================================
+   ADD LAYER (within an existing group)
+   ============================================================ */
+function doAddLayer(ctx) {
+  // From a group or layer kebab → add a new layer to that group.
+  // From an accessory kebab → toast (accessories don't have layers).
+  if (ctx.kind === 'accessory') {
+    showToast('Accessories don\'t have layers');
+    return;
+  }
+  const g = state.makeup.groups.find(x => x.id === ctx.groupId);
+  if (!g) return;
+
+  const layerNum = state.makeup.nextLayerNum++;
+  const layerId = `l_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+  const newLayer = {
+    id: layerId,
+    name: `Layer ${layerNum}`,
+    showGuides: true,
+    applyMask: false,
+    visible: true,
+    alphaLocked: false,
+  };
+  // New layer goes on TOP (beginning of array, since stack order is top-down in UI)
+  g.layers.unshift(newLayer);
+  g.expanded = true;
+  state.makeup.selectedLayerRef = { groupId: g.id, layerId };
+  renderMakeupPanel();
+  showToast(`Added ${newLayer.name}`);
+}
+
+/* ============================================================
+   REMOVE LAYER + UNDO SNACKBAR
+   ============================================================ */
+const undoSnackbar = document.getElementById('undoSnackbar');
+const undoSnackbarMsg = document.getElementById('undoSnackbarMsg');
+const undoSnackbarBtn = document.getElementById('undoSnackbarBtn');
+let undoSnackbarTimer = null;
+let pendingUndo = null; // { restore: fn }
+
+function showUndoSnackbar(message, restoreFn) {
+  // If a previous undo is queued, finalize it (it's no longer undoable)
+  if (undoSnackbarTimer) {
+    clearTimeout(undoSnackbarTimer);
+    pendingUndo = null;
+  }
+  undoSnackbarMsg.textContent = message;
+  pendingUndo = { restore: restoreFn };
+  undoSnackbar.classList.add('show');
+  undoSnackbarTimer = setTimeout(() => {
+    undoSnackbar.classList.remove('show');
+    undoSnackbarTimer = null;
+    pendingUndo = null;
+  }, 4000);
+}
+
+undoSnackbarBtn.addEventListener('click', () => {
+  if (pendingUndo) {
+    pendingUndo.restore();
+    pendingUndo = null;
+  }
+  if (undoSnackbarTimer) {
+    clearTimeout(undoSnackbarTimer);
+    undoSnackbarTimer = null;
+  }
+  undoSnackbar.classList.remove('show');
+});
+
+function doRemoveLayer(ctx) {
+  if (ctx.kind === 'group') {
+    // Remove the entire group
+    const idx = state.makeup.groups.findIndex(x => x.id === ctx.groupId);
+    if (idx < 0) return;
+    const removed = state.makeup.groups[idx];
+    state.makeup.groups.splice(idx, 1);
+    // Clear selection if it was inside the removed group
+    if (state.makeup.selectedLayerRef && state.makeup.selectedLayerRef.groupId === removed.id) {
+      state.makeup.selectedLayerRef = null;
+    }
+    renderMakeupPanel();
+    showUndoSnackbar(`'${removed.name}' Group Removed`, () => {
+      state.makeup.groups.splice(idx, 0, removed);
+      renderMakeupPanel();
+    });
+    return;
+  }
+
+  if (ctx.kind === 'layer') {
+    const g = state.makeup.groups.find(x => x.id === ctx.groupId);
+    if (!g) return;
+    const idx = g.layers.findIndex(l => l.id === ctx.layerId);
+    if (idx < 0) return;
+    const removed = g.layers[idx];
+
+    // Don't allow removing the last layer of a group (group needs at least 1)
+    if (g.layers.length <= 1) {
+      showToast('Cannot remove the only layer in a group');
+      return;
+    }
+
+    g.layers.splice(idx, 1);
+    // Update selection: pick another layer in the same group if the removed one was selected
+    if (state.makeup.selectedLayerRef &&
+        state.makeup.selectedLayerRef.groupId === g.id &&
+        state.makeup.selectedLayerRef.layerId === removed.id) {
+      const newLayer = g.layers[0]; // pick the topmost remaining
+      state.makeup.selectedLayerRef = newLayer ? { groupId: g.id, layerId: newLayer.id } : null;
+    }
+    renderMakeupPanel();
+    // Use a short readable name like 'Face 1'
+    const shortName = `${MAKEUP_GROUP_TYPES[g.type].label.replace(' Group','')} ${removed.name.replace('Layer ','')}`;
+    showUndoSnackbar(`'${shortName}' Layer Removed`, () => {
+      g.layers.splice(idx, 0, removed);
+      state.makeup.selectedLayerRef = { groupId: g.id, layerId: removed.id };
+      renderMakeupPanel();
+    });
+    return;
+  }
+
+  if (ctx.kind === 'accessory') {
+    const idx = state.makeup.accessories.findIndex(a => a.id === ctx.accId);
+    if (idx < 0) return;
+    const removed = state.makeup.accessories[idx];
+    state.makeup.accessories.splice(idx, 1);
+    renderMakeupPanel();
+    showUndoSnackbar(`'${removed.name}' Removed`, () => {
+      state.makeup.accessories.splice(idx, 0, removed);
+      renderMakeupPanel();
+    });
+    return;
+  }
 }
 
 /* ============================================================
@@ -2901,6 +3863,7 @@ function closePreview() {
   previewScreen.classList.remove('open');
   previewScreen.classList.remove('owned-open');
   phoneScreen.classList.remove('preview-mode');
+  phoneScreen.classList.remove('owned-mode');
 }
 
 function switchPreviewTab(tab) {
@@ -2913,11 +3876,14 @@ function switchPreviewTab(tab) {
   previewSingle.style.display = (tab === 'myavatar' || tab === 'owned') ? 'flex' : 'none';
   previewCarousel.style.display = (tab === 'default') ? 'flex' : 'none';
 
-  // Owned panel toggle
+  // Owned panel toggle — class on preview screen AND on phone-screen so the
+  // top-right group can react (shift left, same as tray-open in creator)
   if (tab === 'owned') {
     previewScreen.classList.add('owned-open');
+    phoneScreen.classList.add('owned-mode');
   } else {
     previewScreen.classList.remove('owned-open');
+    phoneScreen.classList.remove('owned-mode');
   }
 
   // Center the carousel on its middle item when switching to default
