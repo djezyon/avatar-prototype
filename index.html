@@ -596,6 +596,54 @@ input[type="range"]::-moz-range-thumb {
   border: none;
 }
 
+/* Brush panel — spacing + range height (Figma spec) */
+#panel-brush > .toggle-row {
+  padding: 0 4px;
+}
+#panel-brush > .toggle-row + .toggle-row {
+  margin-top: 8px;
+}
+#panel-brush > .slider-row:first-of-type {
+  margin-top: 16px;
+}
+#panel-brush > .slider-row {
+  padding: 0 4px;
+}
+#panel-brush > .slider-row + .slider-row {
+  margin-top: 4px;
+}
+#panel-brush .slider-stack {
+  gap: 4px;
+}
+#panel-brush input[type="range"] {
+  height: 13.5px;
+  background: transparent;
+}
+#panel-brush input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.15);
+}
+#panel-brush input[type="range"]::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+}
+#panel-brush input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.15);
+}
+#panel-brush input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
 /* Color section */
 .color-row {
   display: flex;
