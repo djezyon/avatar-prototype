@@ -603,7 +603,8 @@ input[type="range"]::-moz-range-thumb {
 #panel-brush > .toggle-row + .toggle-row {
   margin-top: 8px;
 }
-#panel-brush > .slider-row:first-of-type {
+/* 16px after toggle stack — :first-of-type does not mean “first .slider-row” (first div is a toggle) */
+#panel-brush > .toggle-row + .toggle-row + .toggle-row + .slider-row {
   margin-top: 16px;
 }
 #panel-brush > .slider-row {
