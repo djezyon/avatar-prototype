@@ -1278,13 +1278,33 @@ input[type="range"]::-moz-range-thumb {
               margin-left var(--dur-tray) var(--ease-out),
               margin-right var(--dur-tray) var(--ease-out);
 }
-.phone-screen.tray-open .icon-btn.tray-hide,
-.phone-screen.preview-mode .icon-btn.tray-hide {
+.phone-screen.tray-open .icon-btn.tray-hide {
   opacity: 0;
   width: 0;
   margin-left: 0;
   margin-right: 0;
   pointer-events: none;
+}
+
+/* Buttons marked preview-hide collapse to invisible during preview-mode
+   (e.g. Avatar button — it's only useful from the Creator to OPEN preview) */
+.phone-screen.preview-mode .icon-btn.preview-hide {
+  opacity: 0;
+  width: 0;
+  margin-left: 0;
+  margin-right: 0;
+  pointer-events: none;
+}
+
+/* During preview-mode, the right-side pill must float ABOVE the preview overlay
+   (which has z-index 80) so undo/redo/reset/exit are accessible from Preview. */
+.phone-screen.preview-mode .top-bar {
+  z-index: 90;
+}
+/* The left pill (diamond + menu) gets hidden in preview because Preview has
+   its own top-left pills with the Roblox logo + menu/mic. */
+.phone-screen.preview-mode .top-bar > .top-group:first-child {
+  visibility: hidden;
 }
 
 /* ============================================================
@@ -1729,7 +1749,7 @@ input[type="range"]::-moz-range-thumb {
         <button class="icon-btn tray-persist" id="refreshBtn" aria-label="Reset">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
         </button>
-        <button class="icon-btn tray-hide" id="avatarBtn" aria-label="Avatar">
+        <button class="icon-btn tray-hide preview-hide" id="avatarBtn" aria-label="Avatar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
         </button>
         <button class="icon-btn" aria-label="Exit">
@@ -2359,7 +2379,25 @@ function clearCanvas() {
 
 document.getElementById('undoBtn').addEventListener('click', undo);
 document.getElementById('redoBtn').addEventListener('click', redo);
-document.getElementById('refreshBtn').addEventListener('click', clearCanvas);
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  if (previewState.open) {
+    // In Preview: reset only the avatar selection (back to default)
+    resetAvatarSelection();
+  } else {
+    // In Creator: just clear the painted canvas (existing behavior)
+    clearCanvas();
+  }
+});
+
+// Reset only the Owned avatar selection back to default (first card).
+// Does NOT touch paint or makeup state.
+function resetAvatarSelection() {
+  if (typeof previewState !== 'undefined') {
+    previewState.ownedSelectedIndex = 0;
+  }
+  if (typeof renderOwnedGrid === 'function') renderOwnedGrid();
+  showToast('Reset to default avatar');
+}
 
 /* ============================================================
    TOOL SELECTION
@@ -3923,7 +3961,7 @@ document.querySelectorAll('.preview-tab').forEach(btn => {
   btn.addEventListener('click', () => switchPreviewTab(btn.dataset.previewTab));
 });
 
-// Avatar button in creator opens preview
+// Avatar button (only visible in Creator mode) — opens the Preview screen
 document.getElementById('avatarBtn').addEventListener('click', openPreview);
 
 // Owned panel close: returns to "My Avatar" tab and applies selection (just toast for v1)
