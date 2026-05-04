@@ -291,6 +291,19 @@ body {
   margin-left: 0;
 }
 
+/* Connected pairs (brush+eraser, sticker+pattern): square inner seam — outer corners stay rounded.
+   PNGs include the pill background; clipping the button masks the inner rounded corners. */
+.tool-btn[data-tool="brush"]:has(+ .tool-btn[data-tool="eraser"].visible),
+.tool-btn[data-tool="sticker"]:has(+ .tool-btn[data-tool="pattern"].visible) {
+  border-radius: 10px 0 0 10px;
+  overflow: hidden;
+}
+.tool-btn[data-tool="eraser"].visible,
+.tool-btn[data-tool="pattern"].visible {
+  border-radius: 0 10px 10px 0;
+  overflow: hidden;
+}
+
 .tool-btn {
   width: 36px;
   height: 36px;
