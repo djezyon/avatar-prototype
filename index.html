@@ -297,13 +297,26 @@ body {
   height: 36px;
   display: block;
   pointer-events: none;
-  /* Hide the baked-in dark background by blending with toolbar */
-  mix-blend-mode: screen;
 }
-.tool-btn .icon-on { display: none; }
-.tool-btn .icon-off { display: block; }
-.tool-btn.active .icon-on { display: block; }
-.tool-btn.active .icon-off { display: none; }
+/* 3-state image swap:
+   - Default: show .icon-default (or .icon-active for conditionals like eraser/pattern that have no default)
+   - Group active: show .icon-active (when this tool's group is active but this tool isn't selected)
+   - Selected: show .icon-selected
+   The toolbar adds .group-active to brush+eraser when brush group is active,
+   and to sticker+pattern when sticker group is active. */
+.tool-btn .icon-default { display: block; }
+.tool-btn .icon-active { display: none; }
+.tool-btn .icon-selected { display: none; }
+
+/* When the tool's group is active but this tool isn't the chosen one */
+.tool-btn.group-active .icon-default { display: none; }
+.tool-btn.group-active .icon-active { display: block; }
+.tool-btn.group-active .icon-selected { display: none; }
+
+/* When this tool is the chosen one */
+.tool-btn.active .icon-default { display: none; }
+.tool-btn.active .icon-active { display: none; }
+.tool-btn.active .icon-selected { display: block; }
 
 /* Conditional tools (eraser, pattern) — slide in animation */
 .tool-btn.conditional {
@@ -1762,69 +1775,40 @@ input[type="range"]::-moz-range-thumb {
     <div class="bottom-toolbar" id="bottomToolbar">
       <!-- Makeup: round powder compact + lipstick tube -->
       <button class="tool-btn" data-tool="makeup" aria-label="Makeup">
-        <img class="icon-off" src="./assets/icons/makeup_off.png" alt="">
-        <img class="icon-on" src="./assets/icons/makeup_on.png" alt="">
+        <img class="icon-default" src="./assets/icons/makeup_default.png" alt="">
+        <img class="icon-selected" src="./assets/icons/makeup_selected.png" alt="">
       </button>
-      <!-- Brush: paintbrush angled -->
+      <!-- Brush: 3-state (default / active / selected) -->
       <button class="tool-btn" data-tool="brush" aria-label="Brush">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 4 L20 10 L11 19 L5 19 L5 13 Z"/>
-          <line x1="14" y1="4" x2="20" y2="10" stroke-width="1.6"/>
-          <line x1="11" y1="13" x2="14" y2="16"/>
-        </svg>
+        <img class="icon-default" src="./assets/icons/brush_default.png" alt="">
+        <img class="icon-active" src="./assets/icons/brush_active.png" alt="">
+        <img class="icon-selected" src="./assets/icons/brush_selected.png" alt="">
       </button>
-      <!-- Eraser (conditional, after brush) -->
+      <!-- Eraser (conditional, only visible when brush group is active) — 2-state (active / selected) -->
       <button class="tool-btn conditional" data-tool="eraser" aria-label="Eraser">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 3 L21 8 L11 18 L4 18 L4 13 Z"/>
-          <line x1="9" y1="8" x2="16" y2="15"/>
-          <line x1="4" y1="18" x2="14" y2="18"/>
-        </svg>
+        <img class="icon-active" src="./assets/icons/eraser_active.png" alt="">
+        <img class="icon-selected" src="./assets/icons/eraser_selected.png" alt="">
       </button>
-      <!-- Sticker: rounded smiley/face sticker -->
+      <!-- Sticker: 3-state (default / active / selected) -->
       <button class="tool-btn" data-tool="sticker" aria-label="Sticker">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 4 Q4 3 5 3 L17 3 Q19 3 19 5 L19 14 Q19 15 18 15 L15 15 Q14 15 13 16 L8 21 Q5 21 5 18 L5 5 Q5 4 4 4 Z"/>
-          <circle cx="9" cy="10" r="0.9" fill="currentColor" stroke="none"/>
-          <circle cx="14" cy="10" r="0.9" fill="currentColor" stroke="none"/>
-          <path d="M9.5 13.5 Q11.5 15 13.5 13.5"/>
-        </svg>
+        <img class="icon-default" src="./assets/icons/sticker_default.png" alt="">
+        <img class="icon-active" src="./assets/icons/sticker_active.png" alt="">
+        <img class="icon-selected" src="./assets/icons/sticker_selected.png" alt="">
       </button>
-      <!-- Pattern (conditional, after sticker) — 4x4 dot grid -->
+      <!-- Pattern (conditional, only visible when sticker group is active) — 2-state (active / selected) -->
       <button class="tool-btn conditional" data-tool="pattern" aria-label="Pattern">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <circle cx="6" cy="6" r="1.1"/><circle cx="11" cy="6" r="1.1"/><circle cx="16" cy="6" r="1.1"/>
-          <circle cx="6" cy="11" r="1.1"/><circle cx="11" cy="11" r="1.1"/><circle cx="16" cy="11" r="1.1"/>
-          <circle cx="6" cy="16" r="1.1"/><circle cx="11" cy="16" r="1.1"/><circle cx="16" cy="16" r="1.1"/>
-        </svg>
+        <img class="icon-active" src="./assets/icons/pattern_active.png" alt="">
+        <img class="icon-selected" src="./assets/icons/pattern_selected.png" alt="">
       </button>
-      <!-- Eyelash/Eyebrow: closed eyes with lashes -->
+      <!-- Eyelash/Eyebrow: 2-state (default / selected) -->
       <button class="tool-btn" data-tool="lashes" aria-label="Eyelash & Eyebrow">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <!-- Left closed eye -->
-          <path d="M3 13 Q6 10 9 13"/>
-          <line x1="3.2" y1="13" x2="2.5" y2="15"/>
-          <line x1="4.5" y1="13.6" x2="4" y2="15.5"/>
-          <line x1="6" y1="13.8" x2="6" y2="16"/>
-          <line x1="7.5" y1="13.6" x2="8" y2="15.5"/>
-          <line x1="8.8" y1="13" x2="9.5" y2="15"/>
-          <!-- Right closed eye -->
-          <path d="M15 13 Q18 10 21 13"/>
-          <line x1="15.2" y1="13" x2="14.5" y2="15"/>
-          <line x1="16.5" y1="13.6" x2="16" y2="15.5"/>
-          <line x1="18" y1="13.8" x2="18" y2="16"/>
-          <line x1="19.5" y1="13.6" x2="20" y2="15.5"/>
-          <line x1="20.8" y1="13" x2="21.5" y2="15"/>
-        </svg>
+        <img class="icon-default" src="./assets/icons/lashes_default.png" alt="">
+        <img class="icon-selected" src="./assets/icons/lashes_selected.png" alt="">
       </button>
-      <!-- Kitbash: hash/grid (#) -->
+      <!-- Kitbash: 2-state (default / selected) -->
       <button class="tool-btn" data-tool="kitbash" aria-label="Kitbash">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <line x1="9" y1="3" x2="7" y2="21"/>
-          <line x1="17" y1="3" x2="15" y2="21"/>
-          <line x1="3" y1="9" x2="21" y2="9"/>
-          <line x1="3" y1="15" x2="21" y2="15"/>
-        </svg>
+        <img class="icon-default" src="./assets/icons/kitbash_default.png" alt="">
+        <img class="icon-selected" src="./assets/icons/kitbash_selected.png" alt="">
       </button>
     </div>
 
@@ -2446,12 +2430,11 @@ function selectTool(tool, opts = {}) {
     patternBtn.classList.add('visible');
     eraserBtn.classList.remove('visible');
   } else if (tool === 'eraser') {
-    // eraser stays visible — brush parent stays selected too (but eraser is the active drawing tool)
     state.brushSelected = true;
   } else if (tool === 'pattern') {
     state.stickerSelected = true;
   } else {
-    // Other tools (makeup, lashes, addons) — clear conditionals
+    // Other tools (makeup, lashes, kitbash) — clear conditionals
     state.brushSelected = false;
     state.stickerSelected = false;
     eraserBtn.classList.remove('visible');
@@ -2460,16 +2443,25 @@ function selectTool(tool, opts = {}) {
 
   state.activeTool = tool;
 
-  // Update active button states
+  // Reset all tool button states first
   toolButtons.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tool === tool);
+    btn.classList.remove('active', 'group-active');
   });
-  // For brush+eraser: brush stays "secondary highlighted"
-  if (tool === 'eraser') {
-    document.querySelector('[data-tool="brush"]').classList.add('active');
-  }
-  if (tool === 'pattern') {
-    document.querySelector('[data-tool="sticker"]').classList.add('active');
+
+  // Mark the chosen tool as active (shows _selected icon)
+  document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
+
+  // Mark sibling tools in the same group as group-active (shows _active icon).
+  // - Brush group: brush + eraser
+  // - Sticker group: sticker + pattern
+  if (tool === 'brush') {
+    eraserBtn.classList.add('group-active');
+  } else if (tool === 'eraser') {
+    document.querySelector('[data-tool="brush"]').classList.add('group-active');
+  } else if (tool === 'sticker') {
+    patternBtn.classList.add('group-active');
+  } else if (tool === 'pattern') {
+    document.querySelector('[data-tool="sticker"]').classList.add('group-active');
   }
 
   // Open tray (no animation if already open, slide in if closed)
@@ -2492,7 +2484,7 @@ function deselectAll() {
   state.activeTool = null;
   state.brushSelected = false;
   state.stickerSelected = false;
-  toolButtons.forEach(btn => btn.classList.remove('active'));
+  toolButtons.forEach(btn => btn.classList.remove('active', 'group-active'));
   eraserBtn.classList.remove('visible');
   patternBtn.classList.remove('visible');
   // Slide tray out (with animation)
