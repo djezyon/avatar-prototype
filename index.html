@@ -255,7 +255,8 @@ body {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 4px;
+  /* No flex gap — we control spacing per-button via margin-left below */
+  gap: 0;
   background: var(--surface-toolbar);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -270,18 +271,29 @@ body {
   transform: translateX(calc(-50% - calc(var(--tray-w) / 2)));
 }
 
-/* Zero-gap between brush↔eraser and sticker↔pattern so they read as
-   a connected pair when the group is active. Only when the conditional
-   sibling is actually visible (otherwise it has width:0 and the margin
-   would create a weird offset). */
-.tool-btn[data-tool="brush"] + .tool-btn[data-tool="eraser"].visible,
+/* Default 4px spacing between consecutive tool buttons */
+.tool-btn + .tool-btn {
+  margin-left: 4px;
+}
+
+/* When a conditional button (eraser, pattern) is hidden (width: 0),
+   it shouldn't add margin-left or it creates phantom 4px gaps. */
+.tool-btn.conditional:not(.visible) {
+  margin-left: 0 !important;
+}
+
+/* Zero gap between brush↔eraser when eraser is visible (group active) */
+.tool-btn[data-tool="brush"] + .tool-btn[data-tool="eraser"].visible {
+  margin-left: 0;
+}
+/* Zero gap between sticker↔pattern when pattern is visible (group active) */
 .tool-btn[data-tool="sticker"] + .tool-btn[data-tool="pattern"].visible {
-  margin-left: -4px; /* cancels the parent's gap so they touch */
+  margin-left: 0;
 }
 
 .tool-btn {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border: none;
   background: transparent;
   border-radius: 10px;
@@ -335,7 +347,7 @@ body {
   transition: width 220ms var(--ease-out), opacity 180ms var(--ease-out), margin 220ms var(--ease-out);
 }
 .tool-btn.conditional.visible {
-  width: 40px;
+  width: 36px;
   opacity: 1;
   pointer-events: auto;
 }
