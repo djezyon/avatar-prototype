@@ -597,14 +597,25 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* Brush panel — spacing + range height (Figma spec) */
+#panel-brush {
+  position: relative;
+}
+.brush-select-block {
+  padding: 0 4px;
+}
+.brush-select-block > .brush-combo + .brush-combo {
+  margin-top: 8px;
+}
+#panel-brush > .brush-select-block + .toggle-row {
+  margin-top: 16px;
+}
 #panel-brush > .toggle-row {
   padding: 0 4px;
 }
 #panel-brush > .toggle-row + .toggle-row {
   margin-top: 8px;
 }
-/* 16px after toggle stack — :first-of-type does not mean “first .slider-row” (first div is a toggle) */
-#panel-brush > .toggle-row + .toggle-row + .toggle-row + .slider-row {
+#panel-brush > .toggle-row:last-of-type + .slider-row {
   margin-top: 16px;
 }
 #panel-brush > .slider-row {
@@ -643,6 +654,105 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
   border: none;
   box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* Brush Type / Texture combobox (Figma-style) */
+.brush-combo-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.brush-combo-anchor {
+  position: relative;
+}
+.brush-combo-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #fff;
+  background: rgba(0,0,0,0.35);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.brush-combo-trigger:hover {
+  background: rgba(255,255,255,0.06);
+}
+.brush-combo-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.brush-combo-chevron {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.9;
+}
+.brush-combo-chevron svg {
+  width: 14px;
+  height: 14px;
+}
+.brush-combo.open .brush-combo-chevron svg {
+  transform: rotate(180deg);
+}
+.brush-combo-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 80;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid #fff;
+  background: rgba(18,18,18,0.98);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+}
+.brush-combo.open .brush-combo-list {
+  display: flex;
+}
+.brush-combo-option {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+.brush-combo-option-inner {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+.brush-combo-option:hover .brush-combo-option-inner,
+.brush-combo-option:focus-visible .brush-combo-option-inner {
+  border: 1px dashed #fff;
+  padding: 9px 11px;
+}
+.brush-combo-option[aria-selected="true"] .brush-combo-option-inner {
+  background: rgba(255,255,255,0.06);
 }
 
 /* Color section */
@@ -2174,7 +2284,7 @@ input[type="range"]::-moz-range-thumb {
     <!-- SIDE TRAY -->
     <aside class="tray" id="tray">
       <div class="tray-header">
-        <div class="tray-title" id="trayTitle">Paintbrush</div>
+        <div class="tray-title" id="trayTitle">Brush</div>
         <div class="tray-header-actions">
           <button class="tray-icon-btn" id="trayCloseBtn" aria-label="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -2185,6 +2295,38 @@ input[type="range"]::-moz-range-thumb {
       <div class="tray-body">
         <!-- BRUSH PANEL -->
         <div class="panel" id="panel-brush">
+          <div class="brush-select-block">
+            <div class="brush-combo" id="brushTypeCombo" data-state-key="brushPreset">
+              <div class="brush-combo-label" id="brushTypeComboLabel">Brush Type</div>
+              <div class="brush-combo-anchor">
+                <button type="button" class="brush-combo-trigger" id="brushTypeComboTrigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="brushTypeComboLabel">
+                  <span class="brush-combo-value" id="brushTypeComboValue">Smooth</span>
+                  <span class="brush-combo-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></span>
+                </button>
+                <div class="brush-combo-list" id="brushTypeComboList" role="listbox" aria-labelledby="brushTypeComboLabel" aria-hidden="true">
+                  <button type="button" class="brush-combo-option" role="option" data-value="smooth" aria-selected="true"><span class="brush-combo-option-inner">Smooth</span></button>
+                  <button type="button" class="brush-combo-option" role="option" data-value="wet" aria-selected="false"><span class="brush-combo-option-inner">Wet</span></button>
+                  <button type="button" class="brush-combo-option" role="option" data-value="dry" aria-selected="false"><span class="brush-combo-option-inner">Dry</span></button>
+                  <button type="button" class="brush-combo-option" role="option" data-value="stamp" aria-selected="false"><span class="brush-combo-option-inner">Stamp</span></button>
+                </div>
+              </div>
+            </div>
+            <div class="brush-combo" id="brushTextureCombo" data-state-key="brushTexture">
+              <div class="brush-combo-label" id="brushTextureComboLabel">Texture</div>
+              <div class="brush-combo-anchor">
+                <button type="button" class="brush-combo-trigger" id="brushTextureComboTrigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="brushTextureComboLabel">
+                  <span class="brush-combo-value" id="brushTextureComboValue">None</span>
+                  <span class="brush-combo-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></span>
+                </button>
+                <div class="brush-combo-list" id="brushTextureComboList" role="listbox" aria-labelledby="brushTextureComboLabel" aria-hidden="true">
+                  <button type="button" class="brush-combo-option" role="option" data-value="none" aria-selected="true"><span class="brush-combo-option-inner">None</span></button>
+                  <button type="button" class="brush-combo-option" role="option" data-value="grain" aria-selected="false"><span class="brush-combo-option-inner">Fine grain</span></button>
+                  <button type="button" class="brush-combo-option" role="option" data-value="stipple" aria-selected="false"><span class="brush-combo-option-inner">Stipple</span></button>
+                  <button type="button" class="brush-combo-option" role="option" data-value="shimmer" aria-selected="false"><span class="brush-combo-option-inner">Shimmer</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="toggle-row">
             <div class="toggle on" data-toggle="mirror"></div>
             <div class="toggle-label">Mirror brush</div>
@@ -2463,6 +2605,8 @@ const state = {
   // Brush settings
   brushSize: 12,
   brushSoftness: 20,
+  brushPreset: 'smooth',
+  brushTexture: 'none',
   metallic: false,
   // Color HSV + alpha
   h: 220, s: 0.85, v: 0.95, a: 1,
@@ -2494,6 +2638,25 @@ const MAKEUP_ACCESSORY_TYPES = {
   eyelash: { label: 'Eyelashes', basePrice: 90 },
   eyebrow: { label: 'Eyebrows', basePrice: 90 },
 };
+
+/** Brush preset → stroke tuning (used in paintStrokeOnLayerSurface) */
+const BRUSH_PRESET_STROKE = {
+  smooth: { softMul: 1, widthMul: 1, alphaMul: 1 },
+  wet: { softMul: 1.22, widthMul: 1.06, alphaMul: 0.94 },
+  dry: { softMul: 0.28, widthMul: 0.94, alphaMul: 0.76 },
+  stamp: { softMul: 0.42, widthMul: 1, alphaMul: 1, stampStepMul: 0.42 },
+};
+/** Texture → dash / shimmer (dash lengths scaled by brush width at stroke time) */
+const TEXTURE_STROKE = {
+  none: { dashScale: null, alphaMul: 1, shimmer: false },
+  grain: { dashScale: [0.2, 0.82], alphaMul: 0.96, shimmer: false },
+  stipple: { dashScale: [0.65, 1.75], alphaMul: 0.87, shimmer: false },
+  shimmer: { dashScale: null, alphaMul: 1, shimmer: true },
+};
+
+const BRUSH_PRESET_LABELS = { smooth: 'Smooth', wet: 'Wet', dry: 'Dry', stamp: 'Stamp' };
+const BRUSH_TEXTURE_LABELS = { none: 'None', grain: 'Fine grain', stipple: 'Stipple', shimmer: 'Shimmer' };
+
 // Inline SVG markup for popup icons (placeholder; replace with PNGs later)
 const MENU_ICONS = {
   face:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><circle cx="9.5" cy="8" r="0.6" fill="currentColor"/><circle cx="11.5" cy="8.5" r="0.6" fill="currentColor"/><circle cx="13.5" cy="8" r="0.6" fill="currentColor"/><circle cx="11" cy="10.5" r="0.6" fill="currentColor"/><path d="M9 19c0-2 1.5-3 3-3s3 1 3 3"/></svg>',
@@ -2925,6 +3088,32 @@ function isAlphaLockedForRef(ref) {
   return !!(l && l.alphaLocked);
 }
 
+function paintShimmerPass(sctx, from, to, effW, alphaLockOn) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dist = Math.hypot(dx, dy);
+  const step = Math.max(5, effW * 0.5);
+  const n = dist < 0.5 ? 1 : Math.max(1, Math.ceil(dist / step));
+  sctx.save();
+  sctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
+  sctx.shadowBlur = 0;
+  sctx.setLineDash([]);
+  for (let i = 0; i <= n; i++) {
+    const t = i / Math.max(1, n);
+    const x = from.x + dx * t;
+    const y = from.y + dy * t;
+    const seed = (Math.floor(x * 0.71) ^ Math.floor(y * 0.93)) >>> 0;
+    const ox = ((seed % 5) - 2) * effW * 0.06;
+    const oy = (((seed >> 2) % 5) - 2) * effW * 0.06;
+    const a = 0.18 + (seed & 3) * 0.05;
+    sctx.fillStyle = `rgba(255,255,255,${a})`;
+    sctx.beginPath();
+    sctx.arc(x + ox, y + oy, Math.max(0.5, effW * 0.1), 0, Math.PI * 2);
+    sctx.fill();
+  }
+  sctx.restore();
+}
+
 function paintStrokeOnLayerSurface(from, to, ref, clipFn) {
   const surf = ensureLayerSurface(ref.groupId, ref.layerId);
   const sctx = surf.getContext('2d');
@@ -2938,34 +3127,118 @@ function paintStrokeOnLayerSurface(from, to, ref, clipFn) {
     sctx.globalCompositeOperation = 'destination-out';
     sctx.lineWidth = parseInt(document.getElementById('eraserSize').value, 10);
     sctx.strokeStyle = 'rgba(0,0,0,1)';
-  } else {
-    sctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
-    sctx.lineWidth = state.brushSize;
-    sctx.strokeStyle = getCurrentColor();
-    if (state.brushSoftness > 0) {
-      sctx.shadowColor = getCurrentColor();
-      sctx.shadowBlur = state.brushSoftness * 0.4;
-    }
-    if (state.metallic) {
-      sctx.shadowBlur = Math.max(sctx.shadowBlur || 0, 8);
-    }
+    sctx.lineCap = 'round';
+    sctx.lineJoin = 'round';
+    sctx.beginPath();
+    sctx.moveTo(from.x, from.y);
+    sctx.lineTo(to.x, to.y);
+    sctx.stroke();
+    sctx.restore();
+    return;
   }
-  sctx.lineCap = 'round';
-  sctx.lineJoin = 'round';
-  sctx.beginPath();
-  sctx.moveTo(from.x, from.y);
-  sctx.lineTo(to.x, to.y);
-  sctx.stroke();
 
-  if (state.activeTool === 'brush' && state.metallic) {
+  const preset = BRUSH_PRESET_STROKE[state.brushPreset] || BRUSH_PRESET_STROKE.smooth;
+  const texture = TEXTURE_STROKE[state.brushTexture] || TEXTURE_STROKE.none;
+  const effW = Math.max(1, state.brushSize * preset.widthMul);
+  const effSoft = state.brushSoftness * preset.softMul;
+  const strokeAlpha = Math.min(1, state.a * preset.alphaMul * texture.alphaMul);
+  const color = getCurrentColor(strokeAlpha);
+  const blurBase = effSoft * 0.4;
+  const isStampPreset = state.brushPreset === 'stamp';
+
+  sctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
+
+  if (isStampPreset) {
+    const radius = effW * 0.5;
+    sctx.fillStyle = color;
+    if (effSoft > 0) {
+      sctx.shadowColor = color;
+      sctx.shadowBlur = blurBase;
+    } else {
+      sctx.shadowBlur = 0;
+    }
+    if (state.metallic) sctx.shadowBlur = Math.max(sctx.shadowBlur || 0, 6);
+    const stepMul = preset.stampStepMul != null ? preset.stampStepMul : 0.42;
+    const step = Math.max(radius * 0.45, effW * stepMul);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dist = Math.hypot(dx, dy);
+    const stampDot = (x, y) => {
+      sctx.beginPath();
+      sctx.arc(x, y, radius, 0, Math.PI * 2);
+      sctx.fill();
+    };
+    if (dist < 0.5) {
+      stampDot(from.x, from.y);
+    } else {
+      const nSteps = Math.max(1, Math.ceil(dist / step));
+      for (let i = 0; i <= nSteps; i++) {
+        const t = i / nSteps;
+        stampDot(from.x + dx * t, from.y + dy * t);
+      }
+    }
+  } else {
+    sctx.lineWidth = effW;
+    sctx.strokeStyle = color;
+    if (effSoft > 0) {
+      sctx.shadowColor = color;
+      sctx.shadowBlur = blurBase;
+    } else {
+      sctx.shadowBlur = 0;
+    }
+    if (state.metallic) sctx.shadowBlur = Math.max(sctx.shadowBlur || 0, 8);
+    if (texture.dashScale) {
+      const scale = Math.max(1.2, effW * 0.18);
+      sctx.setLineDash(texture.dashScale.map(d => d * scale));
+    } else {
+      sctx.setLineDash([]);
+    }
+    sctx.lineCap = 'round';
+    sctx.lineJoin = 'round';
+    sctx.beginPath();
+    sctx.moveTo(from.x, from.y);
+    sctx.lineTo(to.x, to.y);
+    sctx.stroke();
+    sctx.setLineDash([]);
+  }
+
+  if (texture.shimmer) {
+    paintShimmerPass(sctx, from, to, effW, alphaLockOn);
+  }
+
+  if (state.metallic) {
     sctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
     sctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    sctx.lineWidth = state.brushSize * 0.35;
+    sctx.lineWidth = effW * 0.35;
     sctx.shadowBlur = 0;
-    sctx.beginPath();
-    sctx.moveTo(from.x, from.y - state.brushSize * 0.15);
-    sctx.lineTo(to.x, to.y - state.brushSize * 0.15);
-    sctx.stroke();
+    sctx.setLineDash([]);
+    if (!isStampPreset) {
+      sctx.beginPath();
+      sctx.moveTo(from.x, from.y - effW * 0.15);
+      sctx.lineTo(to.x, to.y - effW * 0.15);
+      sctx.stroke();
+    } else {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const dist = Math.hypot(dx, dy);
+      const stepMul = preset.stampStepMul != null ? preset.stampStepMul : 0.42;
+      const step = Math.max(effW * 0.22, effW * stepMul);
+      if (dist < 0.5) {
+        sctx.beginPath();
+        sctx.arc(from.x, from.y - effW * 0.12, effW * 0.15, 0, Math.PI * 2);
+        sctx.stroke();
+      } else {
+        const nSteps = Math.max(1, Math.ceil(dist / step));
+        for (let i = 0; i <= nSteps; i++) {
+          const t = i / nSteps;
+          const x = from.x + dx * t;
+          const y = from.y + dy * t - effW * 0.12;
+          sctx.beginPath();
+          sctx.arc(x, y, effW * 0.15, 0, Math.PI * 2);
+          sctx.stroke();
+        }
+      }
+    }
   }
   sctx.restore();
 }
@@ -3175,7 +3448,7 @@ const panels = {
   kitbash: document.getElementById('panel-kitbash'),
 };
 const toolTitles = {
-  brush: 'Paintbrush',
+  brush: 'Brush',
   eraser: 'Eraser',
   makeup: 'Makeup',
   sticker: 'Stickers',
@@ -3451,6 +3724,97 @@ function updateBrushPreviews() {
 }
 brushSizeInput.addEventListener('input', updateBrushPreviews);
 brushSoftInput.addEventListener('input', updateBrushPreviews);
+
+/* ============================================================
+   BRUSH TYPE / TEXTURE COMBOBOXES
+   ============================================================ */
+function closeAllBrushCombos() {
+  document.querySelectorAll('#panel-brush .brush-combo.open').forEach(c => {
+    c.classList.remove('open');
+    const tr = c.querySelector('.brush-combo-trigger');
+    const list = c.querySelector('.brush-combo-list');
+    if (tr) tr.setAttribute('aria-expanded', 'false');
+    if (list) list.setAttribute('aria-hidden', 'true');
+  });
+}
+
+function syncBrushComboUi(comboEl) {
+  if (!comboEl) return;
+  const key = comboEl.dataset.stateKey;
+  const val = state[key];
+  const valueEl = comboEl.querySelector('.brush-combo-value');
+  if (valueEl) {
+    valueEl.textContent =
+      key === 'brushPreset'
+        ? (BRUSH_PRESET_LABELS[val] || val)
+        : (BRUSH_TEXTURE_LABELS[val] || val);
+  }
+  comboEl.querySelectorAll('.brush-combo-option').forEach(opt => {
+    opt.setAttribute('aria-selected', opt.dataset.value === val ? 'true' : 'false');
+  });
+}
+
+function setupBrushCombo(comboEl) {
+  const trigger = comboEl.querySelector('.brush-combo-trigger');
+  const list = comboEl.querySelector('.brush-combo-list');
+  const stateKey = comboEl.dataset.stateKey;
+  if (!trigger || !list || !stateKey) return;
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const wasOpen = comboEl.classList.contains('open');
+    document.querySelectorAll('#panel-brush .brush-combo.open').forEach(c => {
+      if (c !== comboEl) {
+        c.classList.remove('open');
+        const t = c.querySelector('.brush-combo-trigger');
+        const l = c.querySelector('.brush-combo-list');
+        if (t) t.setAttribute('aria-expanded', 'false');
+        if (l) l.setAttribute('aria-hidden', 'true');
+      }
+    });
+    if (wasOpen) {
+      comboEl.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+      list.setAttribute('aria-hidden', 'true');
+    } else {
+      comboEl.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+      list.setAttribute('aria-hidden', 'false');
+    }
+  });
+
+  list.querySelectorAll('.brush-combo-option').forEach(opt => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state[stateKey] = opt.dataset.value;
+      syncBrushComboUi(comboEl);
+      comboEl.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+      list.setAttribute('aria-hidden', 'true');
+    });
+  });
+}
+
+function initBrushCombos() {
+  const panel = document.getElementById('panel-brush');
+  if (!panel) return;
+  panel.querySelectorAll('.brush-combo').forEach(setupBrushCombo);
+  syncBrushComboUi(document.getElementById('brushTypeCombo'));
+  syncBrushComboUi(document.getElementById('brushTextureCombo'));
+}
+
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('#panel-brush .brush-combo')) closeAllBrushCombos();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!document.querySelector('#panel-brush .brush-combo.open')) return;
+  closeAllBrushCombos();
+  e.preventDefault();
+});
+
+initBrushCombos();
 
 eraserSizeInput.addEventListener('input', () => {
   const size = parseInt(eraserSizeInput.value);
