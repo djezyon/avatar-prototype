@@ -2680,6 +2680,33 @@ function ensureGroupForPaint(regionType) {
   state.makeup.selectedLayerRef = { groupId: g.id, layerId: layer.id };
 }
 
+function ensureFullFaceGroups() {
+  const required = ['face', 'eye', 'lips'];
+  const counts = countGroupsByType();
+  for (const t of required) {
+    if (counts[t] > 1) {
+      return { ok: false, reason: 'duplicates' };
+    }
+  }
+
+  let createdAny = false;
+  for (const t of required) {
+    if (counts[t] === 0) {
+      addMakeupGroup(t, { applyMaskToLayer1: true, silent: true });
+      createdAny = true;
+    }
+  }
+
+  // Ensure Layer 1 exists and has applyMask on.
+  for (const t of required) {
+    const g = state.makeup.groups.find(x => x.type === t);
+    if (!g || !g.layers[0]) return { ok: false, reason: 'missing-layer1' };
+    if (!g.layers[0].applyMask) g.layers[0].applyMask = true;
+  }
+  if (createdAny && typeof renderMakeupPanel === 'function') renderMakeupPanel();
+  return { ok: true, createdAny };
+}
+
 function resolvePaintLayerRef(ref) {
   if (!ref) return null;
   const g = state.makeup.groups.find(x => x.id === ref.groupId);
@@ -2776,10 +2803,12 @@ function startStroke(e) {
   const p = getEventPos(e);
 
   if (state.drawing.mode === 'fullface') {
-    if (!canEnableFullFaceMode()) {
-      showToast('Need exactly one Face, Eyes, and Lips group');
+    const ensured = ensureFullFaceGroups();
+    if (!ensured.ok || !canEnableFullFaceMode()) {
+      showToast('You must have one Eye, Lips and Face group each');
       return;
     }
+    if (ensured.createdAny) showToast('Full Face created Face, Eyes, and Lips Layer 1');
     if (!isInsideHead(p.x, p.y)) return;
   } else {
     if (!state.makeup.selectedLayerRef) {
@@ -3135,6 +3164,12 @@ function selectTool(tool, opts = {}) {
     const savedMode = localStorage.getItem('drawMode');
     if (savedMode === 'fullface' || savedMode === 'regional') {
       state.drawing.mode = savedMode;
+      if (savedMode === 'fullface') {
+        const ensured = ensureFullFaceGroups();
+        if (ensured.createdAny) {
+          showToast('Full Face created Face, Eyes, and Lips Layer 1');
+        }
+      }
       if (savedMode === 'fullface' && !canEnableFullFaceMode()) {
         state.drawing.mode = 'regional';
         localStorage.setItem('drawMode', 'regional');
@@ -3250,6 +3285,12 @@ if (modePickerOverlay) {
       e.stopPropagation();
       const selected = modePickerOverlay.querySelector('.mode-card.selected');
       const mode = selected ? selected.dataset.mode : 'regional';
+      if (mode === 'fullface') {
+        const ensured = ensureFullFaceGroups();
+        if (ensured.createdAny) {
+          showToast('Full Face created Face, Eyes, and Lips Layer 1');
+        }
+      }
       if (mode === 'fullface' && !canEnableFullFaceMode()) {
         showToast('You must have one Eye, Lips and Face group each');
         return;
@@ -3275,6 +3316,12 @@ if (modeToggle) {
     seg.addEventListener('click', () => {
       const mode = seg.dataset.mode;
       if (!mode || mode === state.drawing.mode) return;
+      if (mode === 'fullface') {
+        const ensured = ensureFullFaceGroups();
+        if (ensured.createdAny) {
+          showToast('Full Face created Face, Eyes, and Lips Layer 1');
+        }
+      }
       if (mode === 'fullface' && !canEnableFullFaceMode()) {
         showToast('You must have one Eye, Lips and Face group each');
         return;
