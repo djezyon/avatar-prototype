@@ -434,6 +434,25 @@ body {
   font-weight: 600;
   letter-spacing: -0.01em;
 }
+.tray-mode-toggle {
+  display: none;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.tray.mode-in-header .tray-title {
+  display: none;
+}
+.tray.mode-in-header .tray-mode-toggle {
+  display: inline-flex;
+}
+.tray-mode-toggle .mode-segment {
+  padding: 8px 14px;
+  font-size: 12px;
+}
 .tray-header-actions {
   display: flex;
   gap: 4px;
@@ -928,29 +947,6 @@ input[type="range"]::-moz-range-thumb {
   gap: 0;
   padding-top: 4px;
 }
-.makeup-mode-inline {
-  display: inline-flex;
-  align-items: stretch;
-  gap: 2px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 4px;
-  border-radius: var(--r-pill);
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
-}
-.makeup-mode-inline .mode-segment {
-  padding: 8px 14px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.makeup-mode-inline .mode-segment.active {
-  background: rgba(255,255,255,0.12);
-  color: #fff;
-}
-.makeup-mode-inline .mode-segment:not(.active):hover {
-  background: rgba(255,255,255,0.06);
-}
 /* Restore spacing between major sections (progress row, empty cards, headings, etc.)
    but NOT between group cards and their drop zones — those control their own spacing. */
 .makeup-panel > * + * { margin-top: 14px; }
@@ -978,8 +974,8 @@ input[type="range"]::-moz-range-thumb {
   min-width: 0;
 }
 .makeup-items-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text-primary);
   line-height: 1.2;
 }
@@ -1123,7 +1119,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* Section label between cards */
 .section-heading {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
   padding: 4px 4px 2px 4px;
@@ -2335,6 +2331,10 @@ input[type="range"]::-moz-range-thumb {
     <aside class="tray" id="tray">
       <div class="tray-header">
         <div class="tray-title" id="trayTitle">Brush</div>
+        <div class="tray-mode-toggle" id="trayModeToggle" aria-hidden="true">
+          <button type="button" class="mode-segment" data-mode="regional">Regional mode</button>
+          <button type="button" class="mode-segment" data-mode="fullface">Full face mode</button>
+        </div>
         <div class="tray-header-actions">
           <button class="tray-icon-btn" id="trayCloseBtn" aria-label="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -3488,6 +3488,7 @@ function resetAvatarSelection() {
 const toolButtons = document.querySelectorAll('.tool-btn');
 const tray = document.getElementById('tray');
 const trayTitle = document.getElementById('trayTitle');
+const trayModeToggle = document.getElementById('trayModeToggle');
 const panels = {
   brush: document.getElementById('panel-brush'),
   eraser: document.getElementById('panel-eraser'),
@@ -3514,17 +3515,26 @@ const modePickerOverlay = document.getElementById('modePickerOverlay');
 const modePickerDialog = modePickerOverlay && modePickerOverlay.querySelector('.mode-picker-dialog');
 
 function updateModeTogglePill() {
-  if (!modeToggle) return;
-  const showPill = (
+  const showPill = !!modeToggle && (
     state.activeTool === 'brush' ||
     state.activeTool === 'eraser' ||
     state.activeTool === 'makeup'
   );
-  modeToggle.classList.toggle('visible', showPill);
-  modeToggle.setAttribute('aria-hidden', showPill ? 'false' : 'true');
-  modeToggle.querySelectorAll('.mode-segment').forEach(seg => {
-    seg.classList.toggle('active', seg.dataset.mode === state.drawing.mode);
-  });
+  if (modeToggle) {
+    modeToggle.classList.toggle('visible', showPill);
+    modeToggle.setAttribute('aria-hidden', showPill ? 'false' : 'true');
+    modeToggle.querySelectorAll('.mode-segment').forEach(seg => {
+      seg.classList.toggle('active', seg.dataset.mode === state.drawing.mode);
+    });
+  }
+  const showHeaderMode = state.activeTool === 'makeup';
+  tray.classList.toggle('mode-in-header', showHeaderMode);
+  if (trayModeToggle) {
+    trayModeToggle.setAttribute('aria-hidden', showHeaderMode ? 'false' : 'true');
+    trayModeToggle.querySelectorAll('.mode-segment').forEach(seg => {
+      seg.classList.toggle('active', seg.dataset.mode === state.drawing.mode);
+    });
+  }
 }
 
 function showModePicker() {
@@ -3648,6 +3658,7 @@ function deselectAll() {
   // Slide tray out (with animation)
   tray.classList.remove('no-anim');
   tray.classList.remove('open');
+  tray.classList.remove('mode-in-header');
   bottomToolbar.classList.remove('tray-open');
   document.querySelector('.phone-screen').classList.remove('tray-open');
 
@@ -3722,6 +3733,30 @@ if (modeToggle) {
       updateModeTogglePill();
       showToast(mode === 'fullface' ? 'Full Face mode' : 'Regional mode');
       maybeToastRegionalLayerPrompt();
+    });
+  });
+}
+if (trayModeToggle) {
+  trayModeToggle.querySelectorAll('.mode-segment').forEach(seg => {
+    seg.addEventListener('click', () => {
+      const mode = seg.dataset.mode;
+      if (!mode || mode === state.drawing.mode) return;
+      if (mode === 'fullface') {
+        const ensured = ensureFullFaceGroups();
+        if (ensured.createdAny) {
+          showToast('Full Face created Face, Eyes, and Lips Layer 1');
+        }
+      }
+      if (mode === 'fullface' && !canEnableFullFaceMode()) {
+        showToast('You must have one Eye, Lips and Face group each');
+        return;
+      }
+      state.drawing.mode = mode;
+      localStorage.setItem('drawMode', mode);
+      updateModeTogglePill();
+      showToast(mode === 'fullface' ? 'Full Face mode' : 'Regional mode');
+      maybeToastRegionalLayerPrompt();
+      if (state.activeTool === 'makeup') renderMakeupPanel();
     });
   });
 }
@@ -4206,15 +4241,6 @@ function renderMakeupPanel() {
 
   let html = '';
 
-  const regionalActive = state.drawing.mode === 'regional' ? 'active' : '';
-  const fullfaceActive = state.drawing.mode === 'fullface' ? 'active' : '';
-  html += `
-    <div class="makeup-mode-inline">
-      <button type="button" class="mode-segment ${regionalActive}" data-action="makeup-mode" data-mode="regional">Regional mode</button>
-      <button type="button" class="mode-segment ${fullfaceActive}" data-action="makeup-mode" data-mode="fullface">Full face mode</button>
-    </div>
-  `;
-
   html += `
     <div class="makeup-items-header">
       <div class="makeup-items-copy">
@@ -4392,22 +4418,6 @@ function attachMakeupHandlers() {
       return;
     }
     openMenuPopup(progAdd, 'all');
-  });
-
-  makeupPanelEl.querySelectorAll('[data-action="makeup-mode"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const mode = btn.dataset.mode;
-      if (!mode || mode === state.drawing.mode) return;
-      if (mode === 'fullface' && !canEnableFullFaceMode()) {
-        showToast('Full Face needs one Face, Eyes, and Lips group each');
-        return;
-      }
-      state.drawing.mode = mode;
-      localStorage.setItem('drawMode', mode);
-      updateModeTogglePill();
-      maybeToastRegionalLayerPrompt();
-      renderMakeupPanel();
-    });
   });
 
   // Empty state CTAs
