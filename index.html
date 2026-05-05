@@ -1309,20 +1309,41 @@ input[type="range"]::-moz-range-thumb {
 
 /* Drop zone — invisible by default, shows chevron indicator on dragover */
 .drop-zone {
-  height: 14px;
-  margin: -7px 0;
+  height: 0;
+  margin: 0;
   position: relative;
   pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  transition: height var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .drag-active .drop-zone {
+  height: 8px;
   pointer-events: auto;
+  opacity: 0.65;
+}
+.drop-zone.over {
+  height: 26px;
+  opacity: 1;
+}
+.drop-zone.over::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.9);
+  transform: translateY(-50%);
 }
 .drop-zone.over::before {
-  /* Chevron pointing toward the layer that will receive the drop */
+  /* Directional caret indicating insertion flow */
   content: '';
+  position: relative;
+  z-index: 1;
   width: 0;
   height: 0;
   border-left: 6px solid transparent;
@@ -1377,6 +1398,7 @@ input[type="range"]::-moz-range-thumb {
 /* Collapse group bodies while reordering groups for easier vertical drag */
 .drag-active-group .group-body {
   max-height: 0 !important;
+  padding: 0 !important;
   overflow: hidden !important;
 }
 /* Group drop zone — also acts as the visual spacer between group cards.
@@ -1389,20 +1411,43 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: height var(--dur-fast) var(--ease-out);
+  opacity: 0;
+  transition: height var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .drag-active-group .group-drop-zone {
-  height: 14px;
+  height: 10px;
   pointer-events: auto;
+  opacity: 0.65;
+}
+.group-drop-zone.over {
+  height: 24px;
+  opacity: 1;
+}
+.group-drop-zone.over::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.9);
+  transform: translateY(-50%);
 }
 .group-drop-zone.over::before {
   content: '';
+  position: relative;
+  z-index: 1;
   width: 0;
   height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-bottom: 7px solid var(--text-primary);
   filter: drop-shadow(0 0 4px rgba(255,255,255,0.4));
+}
+.group-drop-zone.over.flip-down::before {
+  border-bottom: none;
+  border-top: 7px solid var(--text-primary);
 }
 
 .layer-add-tile {
@@ -4613,7 +4658,7 @@ function attachLayerDragHandlers() {
     row.addEventListener('dragend', () => {
       row.classList.remove('dragging');
       makeupPanelEl.classList.remove('drag-active');
-      makeupPanelEl.querySelectorAll('.drop-zone.over').forEach(z => z.classList.remove('over'));
+      makeupPanelEl.querySelectorAll('.drop-zone.over, .drop-zone.flip-down').forEach(z => z.classList.remove('over', 'flip-down'));
       makeupPanelEl.querySelectorAll('.drag-target-group').forEach(g => g.classList.remove('drag-target-group'));
       dragState = null;
     });
@@ -4628,11 +4673,14 @@ function attachLayerDragHandlers() {
       if (zone.dataset.dropGroup !== dragState.groupId) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      makeupPanelEl.querySelectorAll('.drop-zone.over').forEach(z => z.classList.remove('over'));
+      const rect = zone.getBoundingClientRect();
+      const lowerHalf = e.clientY > rect.top + rect.height / 2;
+      makeupPanelEl.querySelectorAll('.drop-zone.over, .drop-zone.flip-down').forEach(z => z.classList.remove('over', 'flip-down'));
       zone.classList.add('over');
+      zone.classList.toggle('flip-down', lowerHalf);
     });
     zone.addEventListener('dragleave', () => {
-      zone.classList.remove('over');
+      zone.classList.remove('over', 'flip-down');
     });
     zone.addEventListener('drop', (e) => {
       if (!dragState || dragState.kind !== 'layer') return;
@@ -4641,7 +4689,7 @@ function attachLayerDragHandlers() {
       const targetGroupId = zone.dataset.dropGroup;
       const targetIndex = parseInt(zone.dataset.dropIndex, 10);
       moveLayer(dragState.groupId, dragState.layerId, targetGroupId, targetIndex);
-      zone.classList.remove('over');
+      zone.classList.remove('over', 'flip-down');
     });
   });
 
@@ -4676,7 +4724,7 @@ function attachLayerDragHandlers() {
     header.addEventListener('dragend', () => {
       card.classList.remove('dragging-group');
       makeupPanelEl.classList.remove('drag-active-group');
-      makeupPanelEl.querySelectorAll('.group-drop-zone.over').forEach(z => z.classList.remove('over'));
+      makeupPanelEl.querySelectorAll('.group-drop-zone.over, .group-drop-zone.flip-down').forEach(z => z.classList.remove('over', 'flip-down'));
       dragState = null;
     });
   });
@@ -4688,18 +4736,21 @@ function attachLayerDragHandlers() {
       if (!dragState || dragState.kind !== 'group') return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      makeupPanelEl.querySelectorAll('.group-drop-zone.over').forEach(z => z.classList.remove('over'));
+      const rect = zone.getBoundingClientRect();
+      const lowerHalf = e.clientY > rect.top + rect.height / 2;
+      makeupPanelEl.querySelectorAll('.group-drop-zone.over, .group-drop-zone.flip-down').forEach(z => z.classList.remove('over', 'flip-down'));
       zone.classList.add('over');
+      zone.classList.toggle('flip-down', lowerHalf);
     });
     zone.addEventListener('dragleave', () => {
-      zone.classList.remove('over');
+      zone.classList.remove('over', 'flip-down');
     });
     zone.addEventListener('drop', (e) => {
       if (!dragState || dragState.kind !== 'group') return;
       e.preventDefault();
-      const targetIndex = parseInt(zone.dataset.groupDropIndex);
+      const targetIndex = parseInt(zone.dataset.groupDropIndex, 10);
       moveGroup(dragState.groupId, targetIndex);
-      zone.classList.remove('over');
+      zone.classList.remove('over', 'flip-down');
     });
   });
 }
