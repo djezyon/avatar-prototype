@@ -982,6 +982,14 @@ input[type="range"]::-moz-range-thumb {
   gap: 8px;
   padding: 8px;
   cursor: pointer;
+  border-radius: 8px;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.group-header.selected {
+  background: var(--brand-blue);
+}
+.group-header.selected:hover {
+  background: var(--brand-blue-hover);
 }
 .group-thumb {
   width: 32px;
@@ -2438,6 +2446,7 @@ const state = {
     groups: [],       // [{ id, type, name, opacity (0-100), visible, expanded, selectedLayerId, layers: [{ id, name, showGuides, applyMask, visible, alphaLocked }] }]
     accessories: [],  // [{ id, type, name, visible }]
     selectedLayerRef: null, // { groupId, layerId }
+    selectedGroupId: null,
     nextGroupNum: { face: 1, eye: 1, lips: 1 },
     nextLayerNum: 1,
     clipboardLayer: null, // copy/paste buffer
@@ -2987,6 +2996,7 @@ function pushMakeupHistory() {
       groups: state.makeup.groups,
       accessories: state.makeup.accessories,
       selectedLayerRef: state.makeup.selectedLayerRef,
+      selectedGroupId: state.makeup.selectedGroupId,
     }));
     state.history.push({ kind: 'makeup', data: snap });
     if (state.history.length > 30) state.history.shift();
@@ -3025,11 +3035,13 @@ function undo() {
         groups: state.makeup.groups,
         accessories: state.makeup.accessories,
         selectedLayerRef: state.makeup.selectedLayerRef,
+        selectedGroupId: state.makeup.selectedGroupId,
       })),
     });
     state.makeup.groups = entry.data.groups;
     state.makeup.accessories = entry.data.accessories;
     state.makeup.selectedLayerRef = entry.data.selectedLayerRef;
+    state.makeup.selectedGroupId = entry.data.selectedGroupId || null;
     if (typeof renderMakeupPanel === 'function') renderMakeupPanel();
   }
 }
@@ -3063,11 +3075,13 @@ function redo() {
         groups: state.makeup.groups,
         accessories: state.makeup.accessories,
         selectedLayerRef: state.makeup.selectedLayerRef,
+        selectedGroupId: state.makeup.selectedGroupId,
       })),
     });
     state.makeup.groups = entry.data.groups;
     state.makeup.accessories = entry.data.accessories;
     state.makeup.selectedLayerRef = entry.data.selectedLayerRef;
+    state.makeup.selectedGroupId = entry.data.selectedGroupId || null;
     if (typeof renderMakeupPanel === 'function') renderMakeupPanel();
   }
 }
@@ -3822,6 +3836,7 @@ function renderGroupCard(g) {
   const meta = MAKEUP_GROUP_TYPES[g.type];
   const expandedClass = g.expanded ? '' : 'collapsed';
   const chevronRotate = g.expanded ? '180deg' : '0deg';
+  const groupSel = state.makeup.selectedGroupId === g.id;
   let body = '';
   if (g.expanded) {
     g.layers.forEach((l, layerIdx) => {
@@ -3866,7 +3881,7 @@ function renderGroupCard(g) {
   }
   return `
     <div class="group-card" data-group-id="${g.id}">
-      <div class="group-header" data-action="group-toggle" data-group-id="${g.id}" draggable="true">
+      <div class="group-header ${groupSel ? 'selected' : ''}" data-action="group-toggle" data-group-id="${g.id}" draggable="true">
         <div class="group-thumb"${getGroupThumbStyle(g)}></div>
         <div class="group-name">${escapeHtml(g.name)}</div>
         <img class="group-chip" src="./assets/chips/Property_1_${g.type === 'face' ? 'Face' : g.type === 'eye' ? 'Eyes' : 'Lips'}.svg" alt="${meta.label}">
@@ -3940,7 +3955,11 @@ function attachMakeupHandlers() {
         // Don't toggle when clicking on inner buttons
         if (e.target.closest('[data-action]') && e.target.closest('[data-action]') !== el) return;
         const g = state.makeup.groups.find(x => x.id === groupId);
-        if (g) { g.expanded = !g.expanded; renderMakeupPanel(); }
+        if (g) {
+          state.makeup.selectedGroupId = groupId;
+          g.expanded = !g.expanded;
+          renderMakeupPanel();
+        }
       });
     }
     if (action === 'group-vis') {
@@ -4033,6 +4052,7 @@ function attachMakeupHandlers() {
       const groupId = row.dataset.groupId;
       const layerId = row.dataset.layerId;
       state.makeup.selectedLayerRef = { groupId, layerId };
+      state.makeup.selectedGroupId = groupId;
       renderMakeupPanel();
     });
   });
@@ -4074,6 +4094,10 @@ function attachLayerDragHandlers() {
         groupId: row.dataset.groupId,
         layerId: row.dataset.layerId,
       };
+      state.makeup.selectedLayerRef = { groupId: row.dataset.groupId, layerId: row.dataset.layerId };
+      state.makeup.selectedGroupId = row.dataset.groupId;
+      makeupPanelEl.querySelectorAll('.layer-row.selected').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
       row.classList.add('dragging');
       makeupPanelEl.classList.add('drag-active');
       // Mark the source group as the only valid drop area
@@ -4136,6 +4160,9 @@ function attachLayerDragHandlers() {
         kind: 'group',
         groupId: card.dataset.groupId,
       };
+      state.makeup.selectedGroupId = card.dataset.groupId;
+      makeupPanelEl.querySelectorAll('.group-header.selected').forEach(h => h.classList.remove('selected'));
+      header.classList.add('selected');
       card.classList.add('dragging-group');
       makeupPanelEl.classList.add('drag-active-group');
       e.dataTransfer.effectAllowed = 'move';
@@ -4203,6 +4230,7 @@ function moveLayer(srcGroupId, srcLayerId, targetGroupId, targetIndex) {
   srcGroup.layers.splice(insertIdx, 0, layer);
 
   state.makeup.selectedLayerRef = { groupId: srcGroup.id, layerId: layer.id };
+  state.makeup.selectedGroupId = srcGroup.id;
   renderMakeupPanel();
   showToast(`Reordered ${layer.name}`);
 }
@@ -4222,6 +4250,7 @@ function moveGroup(srcGroupId, targetIndex) {
   insertIdx = Math.max(0, Math.min(insertIdx, state.makeup.groups.length));
   state.makeup.groups.splice(insertIdx, 0, group);
 
+  state.makeup.selectedGroupId = group.id;
   renderMakeupPanel();
   showToast(`Reordered ${group.name}`);
 }
@@ -4376,6 +4405,7 @@ function addMakeupGroup(type, opts = {}) {
     ]
   });
   state.makeup.selectedLayerRef = { groupId, layerId };
+  state.makeup.selectedGroupId = groupId;
   renderMakeupPanel();
   if (!opts.silent) showToast(`Added ${meta.label} ${num}`);
 }
