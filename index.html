@@ -592,9 +592,21 @@ input[type="range"] {
   appearance: none;
   width: 100%;
   height: 4px;
-  background: rgba(255,255,255,0.15);
+  --slider-pct: 0%;
+  background: linear-gradient(
+    to right,
+    #F7F7F8 0%,
+    #F7F7F8 var(--slider-pct),
+    rgba(255,255,255,0.15) var(--slider-pct),
+    rgba(255,255,255,0.15) 100%
+  );
   border-radius: 2px;
   outline: none;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: transparent;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -613,6 +625,11 @@ input[type="range"]::-moz-range-thumb {
   background: white;
   cursor: pointer;
   border: none;
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: transparent;
 }
 
 /* Brush panel — spacing + range height (Figma spec) */
@@ -653,12 +670,11 @@ input[type="range"]::-moz-range-thumb {
 }
 #panel-brush input[type="range"] {
   height: 13.5px;
-  background: transparent;
 }
 #panel-brush input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
-  background: rgba(255,255,255,0.15);
+  background: transparent;
 }
 #panel-brush input[type="range"]::-webkit-slider-thumb {
   width: 13px;
@@ -668,7 +684,7 @@ input[type="range"]::-moz-range-thumb {
 #panel-brush input[type="range"]::-moz-range-track {
   height: 4px;
   border-radius: 2px;
-  background: rgba(255,255,255,0.15);
+  background: transparent;
 }
 #panel-brush input[type="range"]::-moz-range-thumb {
   width: 13px;
@@ -3836,6 +3852,16 @@ const brushSoftPreview = document.getElementById('brushSoftPreview');
 const eraserSizeInput = document.getElementById('eraserSize');
 const eraserSizePreview = document.getElementById('eraserSizePreview');
 
+function updateRangeFill(input) {
+  if (!input) return;
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 100);
+  const val = Number(input.value || min);
+  const span = max - min;
+  const pct = span > 0 ? ((val - min) / span) * 100 : 0;
+  input.style.setProperty('--slider-pct', `${Math.max(0, Math.min(100, pct))}%`);
+}
+
 function updateBrushPreviews() {
   const size = parseInt(brushSizeInput.value);
   const soft = parseInt(brushSoftInput.value);
@@ -3851,6 +3877,8 @@ function updateBrushPreviews() {
   brushSoftPreview.style.height = softSize + 'px';
   brushSoftPreview.style.filter = `blur(${soft * 0.06}px)`;
   brushSoftPreview.style.background = getCurrentColorHex();
+  updateRangeFill(brushSizeInput);
+  updateRangeFill(brushSoftInput);
 }
 brushSizeInput.addEventListener('input', updateBrushPreviews);
 brushSoftInput.addEventListener('input', updateBrushPreviews);
@@ -3951,6 +3979,13 @@ eraserSizeInput.addEventListener('input', () => {
   const previewSize = Math.min(30, Math.max(6, size * 0.5));
   eraserSizePreview.style.width = previewSize + 'px';
   eraserSizePreview.style.height = previewSize + 'px';
+  updateRangeFill(eraserSizeInput);
+});
+updateRangeFill(eraserSizeInput);
+document.addEventListener('input', (e) => {
+  if (e.target && e.target.matches('input[type="range"]')) {
+    updateRangeFill(e.target);
+  }
 });
 
 /* ============================================================
@@ -4353,6 +4388,7 @@ function renderMakeupPanel() {
   }
 
   makeupPanelEl.innerHTML = html;
+  makeupPanelEl.querySelectorAll('input[type="range"]').forEach(updateRangeFill);
   attachMakeupHandlers();
   if (typeof compositeAllLayersToDisplay === 'function') compositeAllLayersToDisplay();
 }
