@@ -1173,6 +1173,11 @@ input[type="range"]::-moz-range-thumb {
 .group-card.dragging-group {
   opacity: 0.4;
 }
+/* Collapse group bodies while reordering groups for easier vertical drag */
+.drag-active-group .group-body {
+  max-height: 0 !important;
+  overflow: hidden !important;
+}
 /* Group drop zone — also acts as the visual spacer between group cards.
    - Idle: 4px tall, gives the requested vertical spacing
    - Drag-active: 14px tall, expanded to show the chevron drop indicator */
@@ -1218,6 +1223,21 @@ input[type="range"]::-moz-range-thumb {
 }
 .layer-add-tile:hover { background: rgba(255,255,255,0.08); }
 .layer-add-tile svg { width: 14px; height: 14px; }
+
+.layer-thumb {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(255,255,255,0.24);
+  background-color: #1f2127;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  flex-shrink: 0;
+}
+.layer-row.selected .layer-thumb {
+  border-color: rgba(255,255,255,0.6);
+}
 
 .layer-name {
   flex: 1;
@@ -3641,6 +3661,47 @@ function isAccessoryTypeUsed(type) {
   return state.makeup.accessories.some(a => a.type === type);
 }
 
+function makeThumbDataURLFromSurface(surface, size = 32) {
+  if (!surface) return '';
+  const thumb = document.createElement('canvas');
+  thumb.width = size;
+  thumb.height = size;
+  const tctx = thumb.getContext('2d');
+  tctx.clearRect(0, 0, size, size);
+  tctx.drawImage(surface, 0, 0, surface.width, surface.height, 0, 0, size, size);
+  return thumb.toDataURL();
+}
+
+function getLayerThumbStyle(groupId, layerId) {
+  const surf = layerSurfaces.get(layerSurfaceKey(groupId, layerId));
+  const url = makeThumbDataURLFromSurface(surf);
+  return url ? ` style="background-image:url('${url}');"` : '';
+}
+
+function getGroupThumbStyle(group) {
+  const size = 32;
+  const thumb = document.createElement('canvas');
+  thumb.width = size;
+  thumb.height = size;
+  const tctx = thumb.getContext('2d');
+  tctx.clearRect(0, 0, size, size);
+
+  let hasAny = false;
+  for (let li = group.layers.length - 1; li >= 0; li--) {
+    const layer = group.layers[li];
+    if (!layer.visible) continue;
+    const surf = layerSurfaces.get(layerSurfaceKey(group.id, layer.id));
+    if (!surf) continue;
+    hasAny = true;
+    tctx.save();
+    tctx.globalAlpha = (group.opacity ?? 100) / 100;
+    tctx.drawImage(surf, 0, 0, surf.width, surf.height, 0, 0, size, size);
+    tctx.restore();
+  }
+  if (!hasAny) return '';
+  return ` style="background-image:url('${thumb.toDataURL()}');"`;
+}
+
 function renderMakeupPanel() {
   const groups = state.makeup.groups;
   const accs = state.makeup.accessories;
@@ -3707,6 +3768,7 @@ function renderMakeupPanel() {
 
   makeupPanelEl.innerHTML = html;
   attachMakeupHandlers();
+  if (typeof compositeAllLayersToDisplay === 'function') compositeAllLayersToDisplay();
 }
 
 function renderGroupCard(g) {
@@ -3723,9 +3785,7 @@ function renderGroupCard(g) {
       body += `<div class="drop-zone" data-drop-group="${g.id}" data-drop-index="${layerIdx}"></div>`;
       body += `
         <div class="layer-row ${sel ? 'selected' : ''}" data-group-id="${g.id}" data-layer-id="${l.id}" draggable="true">
-          <button class="layer-add-tile" data-action="layer-add" data-group-id="${g.id}" data-layer-id="${l.id}" aria-label="Add layer">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
+          <div class="layer-thumb"${getLayerThumbStyle(g.id, l.id)}></div>
           <div class="layer-name">${escapeHtml(l.name)}</div>
           <div class="checkbox ${l.visible ? 'checked' : ''}" data-action="layer-vis" data-group-id="${g.id}" data-layer-id="${l.id}"></div>
           <button class="group-action" data-action="layer-menu" data-group-id="${g.id}" data-layer-id="${l.id}" aria-label="Layer options">
@@ -3760,7 +3820,7 @@ function renderGroupCard(g) {
   return `
     <div class="group-card" data-group-id="${g.id}">
       <div class="group-header" data-action="group-toggle" data-group-id="${g.id}" draggable="true">
-        <div class="group-thumb"></div>
+        <div class="group-thumb"${getGroupThumbStyle(g)}></div>
         <div class="group-name">${escapeHtml(g.name)}</div>
         <img class="group-chip" src="./assets/chips/Property_1_${g.type === 'face' ? 'Face' : g.type === 'eye' ? 'Eyes' : 'Lips'}.svg" alt="${meta.label}">
         <button class="cost-pill" data-action="group-cost" data-group-id="${g.id}">
