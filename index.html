@@ -199,6 +199,109 @@ body {
   filter: drop-shadow(0 0 1px rgba(0,0,0,0.6));
   animation: marquee-march 0.6s linear infinite;
 }
+
+/* ---------- Sticker manipulator (over canvas, sticker tool only) ---------- */
+.sticker-manip-layer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+}
+.sticker-manip-layer.interactive {
+  pointer-events: auto;
+}
+.sticker-widget {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+.sticker-widget-inner {
+  position: relative;
+  transform-origin: center center;
+}
+.sticker-widget-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  border-radius: 4px;
+}
+.sticker-widget-outline {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed rgba(255, 255, 255, 0.72);
+  border-radius: 6px;
+  pointer-events: none;
+}
+.sticker-move-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  cursor: move;
+  border-radius: 6px;
+}
+.sticker-handle {
+  position: absolute;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--brand-blue);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: #fff;
+}
+.sticker-handle:active { cursor: grabbing; }
+.sticker-handle.sticker-rotate {
+  left: 50%;
+  bottom: 100%;
+  margin-bottom: 10px;
+  transform: translateX(-50%);
+}
+.sticker-handle.sticker-scale {
+  left: 100%;
+  top: 100%;
+  margin-left: 6px;
+  margin-top: 6px;
+  transform: translate(-50%, -50%);
+  cursor: nwse-resize;
+}
+.sticker-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.progress-add.progress-add-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+body.is-sticker-dragging { user-select: none; }
+body.is-sticker-dragging .draw-canvas { cursor: inherit; }
+
+.sticker-thumb {
+  padding: 0;
+  overflow: hidden;
+  background-image: none;
+  background-color: #1f2127;
+}
+.sticker-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 @keyframes marquee-march {
   to { stroke-dashoffset: -3.5; }
 }
@@ -2336,6 +2439,8 @@ input[type="range"]::-moz-range-progress {
     <div class="stage">
       <!-- Drawable canvas — clipped to head -->
       <canvas class="draw-canvas" id="drawCanvas"></canvas>
+      <input type="file" id="stickerFileInput" accept="image/*" hidden aria-hidden="true">
+      <div class="sticker-manip-layer" id="stickerManipLayer" aria-hidden="true"></div>
       <!-- Marquee selection overlay (shown on Select action) -->
       <div class="selection-overlay" id="selectionOverlay" aria-hidden="true">
         <svg viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -2546,10 +2651,7 @@ input[type="range"]::-moz-range-progress {
           </div>
         </div>
         <div class="panel" id="panel-sticker">
-          <div class="placeholder-content">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/></svg>
-            <div>Sticker library<br>Coming next</div>
-          </div>
+          <div class="makeup-panel sticker-panel" id="stickerPanelContent"></div>
         </div>
         <div class="panel" id="panel-pattern">
           <div class="placeholder-content">
@@ -2773,10 +2875,18 @@ const state = {
     nextLayerNum: 1,
     clipboardLayer: null, // copy/paste buffer
   },
+  // ---------- Face stickers (clipped to head in composite) ----------
+  stickers: {
+    items: [], // { id, name, src, visible, x, y, rotation, scale, baseW, baseH }
+    selectedId: null,
+    nextNum: 1,
+  },
 };
 
 // Limits and config
 const MAKEUP_MAX_GROUPS = 6;
+const STICKER_MAX = 6;
+const stickerImageCache = new Map(); // id -> HTMLImageElement
 const MAKEUP_GROUP_TYPES = {
   face:  { label: 'Face Group', basePrice: 90 },
   eye:   { label: 'Eye Group',  basePrice: 60 },
@@ -2837,6 +2947,7 @@ function resizeCanvas() {
     img.src = saved;
   }
   if (typeof syncAllLayerSurfaceSizes === 'function') syncAllLayerSurfaceSizes();
+  if (typeof renderStickerManipLayer === 'function') renderStickerManipLayer();
 }
 window.addEventListener('resize', resizeCanvas);
 setTimeout(resizeCanvas, 50);
@@ -2967,6 +3078,30 @@ function syncAllLayerSurfaceSizes() {
   compositeAllLayersToDisplay();
 }
 
+function drawStickersClippedToFace(ctx, rect) {
+  const fg = getFaceGeometry(rect);
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(fg.headCx, fg.headCy, fg.headRx, fg.headRy, 0, 0, Math.PI * 2);
+  ctx.clip();
+
+  for (const s of state.stickers.items) {
+    if (!s.visible) continue;
+    const img = stickerImageCache.get(s.id);
+    if (!img || !img.complete || !img.naturalWidth) continue;
+    const bw = s.baseW || img.naturalWidth;
+    const bh = s.baseH || img.naturalHeight;
+    const w = bw * s.scale;
+    const h = bh * s.scale;
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rotation);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 function compositeAllLayersToDisplay() {
   const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
@@ -2989,6 +3124,7 @@ function compositeAllLayersToDisplay() {
       ctx.restore();
     }
   }
+  drawStickersClippedToFace(ctx, rect);
 }
 
 function countGroupsByType() {
@@ -3600,7 +3736,7 @@ const toolTitles = {
   brush: 'Brush',
   eraser: 'Eraser',
   makeup: 'Makeup',
-  sticker: 'Stickers',
+  sticker: 'Sticker items',
   pattern: 'Patterns',
   lashes: 'Eyelash & Eyebrow',
   kitbash: 'Kitbash',
@@ -3662,6 +3798,7 @@ function selectTool(tool, opts = {}) {
     deselectAll();
     return;
   }
+  if (typeof clearStickerPointerSession === 'function') clearStickerPointerSession();
 
   // Entering Brush from non-brush tools: always show the mode picker.
   // (Switching eraser -> brush stays in the same brush group and skips the modal.)
@@ -3743,10 +3880,14 @@ function selectTool(tool, opts = {}) {
   panels[tool].classList.add('active');
   trayTitle.textContent = toolTitles[tool];
 
+  if (tool === 'sticker' && typeof renderStickerPanel === 'function') renderStickerPanel();
+  if (typeof renderStickerManipLayer === 'function') renderStickerManipLayer();
+
   updateModeTogglePill();
 }
 
 function deselectAll() {
+  if (typeof clearStickerPointerSession === 'function') clearStickerPointerSession();
   state.activeTool = null;
   state.brushSelected = false;
   state.stickerSelected = false;
@@ -3759,6 +3900,8 @@ function deselectAll() {
   tray.classList.remove('mode-in-header');
   bottomToolbar.classList.remove('tray-open');
   document.querySelector('.phone-screen').classList.remove('tray-open');
+
+  if (typeof renderStickerManipLayer === 'function') renderStickerManipLayer();
 
   updateModeTogglePill();
 }
@@ -4258,6 +4401,359 @@ document.querySelectorAll('[data-action="tap-only"]').forEach(btn => {
    MAKEUP PANEL — RENDER
    ============================================================ */
 const makeupPanelEl = document.getElementById('makeupPanelContent');
+const stickerPanelEl = document.getElementById('stickerPanelContent');
+
+/* ============================================================
+   STICKER PANEL — FACE-CLIPPED DECALS + MANIPULATOR
+   ============================================================ */
+let stickerPointerSession = null;
+
+function defaultStickerSrc() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#f97316"/></linearGradient></defs><rect width="96" height="96" rx="22" fill="#252830" stroke="rgba(255,255,255,0.35)" stroke-width="2"/><path fill="url(#sg)" stroke="#b45309" stroke-width="1.4" d="M48 18l12 24 26 4L75 62l4.5 26L48 70 16.5 88 21 62 6 46l26-4z"/></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+function newStickerId() {
+  return 'sk_' + Math.random().toString(36).slice(2, 11);
+}
+
+function getStickerById(id) {
+  return state.stickers.items.find(s => s.id === id) || null;
+}
+
+function clearStickerPointerSession() {
+  const sess = stickerPointerSession;
+  if (!sess) return;
+  window.removeEventListener('pointermove', sess._move);
+  window.removeEventListener('pointerup', sess._up);
+  window.removeEventListener('pointercancel', sess._up);
+  document.body.classList.remove('is-sticker-dragging');
+  stickerPointerSession = null;
+}
+
+function removeStickerItem(id) {
+  state.stickers.items = state.stickers.items.filter(s => s.id !== id);
+  stickerImageCache.delete(id);
+  if (state.stickers.selectedId === id) state.stickers.selectedId = null;
+  compositeAllLayersToDisplay();
+  renderStickerPanel();
+  renderStickerManipLayer();
+}
+
+function addStickerItem(src) {
+  if (state.stickers.items.length >= STICKER_MAX) {
+    showToast(`You can add up to ${STICKER_MAX} stickers on the face`);
+    return;
+  }
+  const id = newStickerId();
+  const n = state.stickers.nextNum++;
+  const rect = canvas.getBoundingClientRect();
+  const fg = getFaceGeometry(rect);
+  const s = {
+    id,
+    name: `Sticker ${n}`,
+    src,
+    visible: true,
+    x: fg.headCx,
+    y: fg.headCy,
+    rotation: 0,
+    scale: 0.35,
+    baseW: 96,
+    baseH: 96,
+  };
+  state.stickers.items.push(s);
+  state.stickers.selectedId = id;
+
+  const img = new Image();
+  let dimsApplied = false;
+  const applyLoadedSize = () => {
+    if (dimsApplied) return;
+    dimsApplied = true;
+    const r = canvas.getBoundingClientRect();
+    const g = getFaceGeometry(r);
+    s.baseW = img.naturalWidth || 96;
+    s.baseH = img.naturalHeight || 96;
+    const span = Math.max(s.baseW, s.baseH);
+    const fit = (g.headRx * 1.45) / Math.max(span, 1);
+    s.scale = Math.min(Math.max(fit, 0.12), 2.5);
+    stickerImageCache.set(id, img);
+    compositeAllLayersToDisplay();
+    renderStickerPanel();
+    renderStickerManipLayer();
+  };
+  img.onload = applyLoadedSize;
+  img.onerror = () => {
+    showToast('Could not load that sticker image');
+    removeStickerItem(id);
+  };
+  stickerImageCache.set(id, img);
+  img.src = src;
+  if (img.complete && img.naturalWidth) applyLoadedSize();
+
+  renderStickerPanel();
+  renderStickerManipLayer();
+  compositeAllLayersToDisplay();
+}
+
+function renderStickerPanel() {
+  if (!stickerPanelEl) return;
+  const items = state.stickers.items;
+  const n = items.length;
+  const pct = (n / STICKER_MAX) * 100;
+
+  let html = '';
+  html += `
+    <div class="makeup-items-header">
+      <div class="makeup-items-copy">
+        <div class="makeup-items-title">Sticker items</div>
+        <div class="makeup-items-subtitle">You can add up to ${STICKER_MAX} stickers on the face only</div>
+      </div>
+      <div class="sticker-header-actions">
+        <button type="button" class="progress-add progress-add-ghost" id="stickerUploadBtn" aria-label="Upload sticker image">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+        <button type="button" class="progress-add" id="stickerAddBtn" ${n >= STICKER_MAX ? 'disabled' : ''} aria-label="Add sticker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="progress-row">
+      <div class="progress-track">
+        <div class="progress-fill" style="width:${pct}%;"></div>
+      </div>
+      <div class="progress-label">${n}/${STICKER_MAX} Stickers on face</div>
+    </div>
+  `;
+
+  if (n === 0) {
+    html += `
+      <div class="empty-card" data-section="stickers">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/></svg>
+        </div>
+        <div class="empty-title">Add a sticker to place it on the face.</div>
+        <div class="empty-sub">Drag to move, use rotate and corner arrows to resize.</div>
+        <button type="button" class="btn-blue" id="addStickerEmptyBtn">Add a Sticker</button>
+      </div>
+    `;
+  } else {
+    items.forEach((s) => {
+      const sel = state.stickers.selectedId === s.id;
+      html += `
+        <div class="layer-row sticker-list-row ${sel ? 'selected' : ''}" data-sticker-row-id="${s.id}">
+          <div class="layer-thumb sticker-thumb"><img src="${escapeHtml(s.src)}" alt=""></div>
+          <div class="layer-name">${escapeHtml(s.name)}</div>
+          <div class="checkbox ${s.visible ? 'checked' : ''}" data-sticker-action="vis" data-sticker-id="${s.id}"></div>
+          <button type="button" class="group-action" data-sticker-action="remove" data-sticker-id="${s.id}" aria-label="Remove sticker">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      `;
+    });
+  }
+
+  stickerPanelEl.innerHTML = html;
+  stickerPanelEl.querySelectorAll('input[type="range"]').forEach((el) => {
+    if (typeof updateRangeFill === 'function') updateRangeFill(el);
+  });
+  attachStickerPanelHandlers();
+}
+
+function attachStickerPanelHandlers() {
+  if (!stickerPanelEl) return;
+  const addDefault = () => addStickerItem(defaultStickerSrc());
+  const uploadBtn = document.getElementById('stickerUploadBtn');
+  const addBtn = document.getElementById('stickerAddBtn');
+  const emptyAdd = document.getElementById('addStickerEmptyBtn');
+  const fileInput = document.getElementById('stickerFileInput');
+  if (uploadBtn) {
+    uploadBtn.addEventListener('click', () => {
+      if (fileInput) fileInput.click();
+    });
+  }
+  if (addBtn) addBtn.addEventListener('click', () => addDefault());
+  if (emptyAdd) emptyAdd.addEventListener('click', () => addDefault());
+
+  stickerPanelEl.querySelectorAll('[data-sticker-action="vis"]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sid = el.dataset.stickerId;
+      const s = getStickerById(sid);
+      if (s) {
+        s.visible = !s.visible;
+        compositeAllLayersToDisplay();
+        renderStickerPanel();
+        renderStickerManipLayer();
+      }
+    });
+  });
+  stickerPanelEl.querySelectorAll('[data-sticker-action="remove"]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeStickerItem(el.dataset.stickerId);
+    });
+  });
+  stickerPanelEl.querySelectorAll('[data-sticker-row-id]').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('[data-sticker-action]')) return;
+      state.stickers.selectedId = row.dataset.stickerRowId;
+      renderStickerPanel();
+      renderStickerManipLayer();
+    });
+  });
+}
+
+let stickerManipBound = false;
+function bindStickerManipLayerOnce() {
+  if (stickerManipBound) return;
+  const layer = document.getElementById('stickerManipLayer');
+  if (!layer) return;
+  stickerManipBound = true;
+  layer.addEventListener('pointerdown', stickerManipPointerDown);
+}
+
+function bindStickerFileInputOnce() {
+  const inp = document.getElementById('stickerFileInput');
+  if (!inp || inp.dataset.bound === '1') return;
+  inp.dataset.bound = '1';
+  inp.addEventListener('change', () => {
+    const f = inp.files && inp.files[0];
+    inp.value = '';
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => addStickerItem(String(reader.result || ''));
+    reader.onerror = () => showToast('Could not read file');
+    reader.readAsDataURL(f);
+  });
+}
+
+function startStickerDrag(mode, s, e) {
+  const rect = canvas.getBoundingClientRect();
+  const cx = rect.left + s.x;
+  const cy = rect.top + s.y;
+
+  const _move = (ev) => {
+    const sess = stickerPointerSession;
+    if (!sess || sess.stickerId !== s.id) return;
+    const sticker = getStickerById(s.id);
+    if (!sticker) return;
+
+    if (sess.mode === 'move') {
+      sticker.x = sess.origX + (ev.clientX - sess.startClientX);
+      sticker.y = sess.origY + (ev.clientY - sess.startClientY);
+    } else if (sess.mode === 'rotate') {
+      const ang = Math.atan2(ev.clientY - sess.centerClientY, ev.clientX - sess.centerClientX);
+      sticker.rotation = sess.origRot + (ang - sess.startAngle);
+    } else if (sess.mode === 'scale') {
+      const d = Math.hypot(ev.clientX - sess.centerClientX, ev.clientY - sess.centerClientY);
+      const factor = (d || 0.5) / sess.startDist;
+      sticker.scale = Math.min(3, Math.max(0.08, sess.origScale * factor));
+    }
+    compositeAllLayersToDisplay();
+    renderStickerManipLayer();
+  };
+
+  const _up = () => clearStickerPointerSession();
+
+  stickerPointerSession = {
+    mode,
+    stickerId: s.id,
+    startClientX: e.clientX,
+    startClientY: e.clientY,
+    origX: s.x,
+    origY: s.y,
+    origRot: s.rotation,
+    origScale: s.scale,
+    centerClientX: cx,
+    centerClientY: cy,
+    startAngle: Math.atan2(e.clientY - cy, e.clientX - cx),
+    startDist: Math.max(12, Math.hypot(e.clientX - cx, e.clientY - cy)),
+    _move,
+    _up,
+  };
+  document.body.classList.add('is-sticker-dragging');
+  window.addEventListener('pointermove', _move);
+  window.addEventListener('pointerup', _up);
+  window.addEventListener('pointercancel', _up);
+}
+
+function stickerManipPointerDown(e) {
+  if (state.activeTool !== 'sticker') return;
+  const layer = document.getElementById('stickerManipLayer');
+  if (!layer || !layer.classList.contains('interactive')) return;
+
+  if (e.target === layer) {
+    state.stickers.selectedId = null;
+    renderStickerPanel();
+    renderStickerManipLayer();
+    return;
+  }
+
+  const widget = e.target.closest('.sticker-widget');
+  if (!widget) return;
+  const id = widget.dataset.stickerId;
+  const s = getStickerById(id);
+  if (!s || !s.visible) return;
+
+  if (e.target.closest('.sticker-rotate')) {
+    e.preventDefault();
+    e.stopPropagation();
+    startStickerDrag('rotate', s, e);
+    return;
+  }
+  if (e.target.closest('.sticker-scale')) {
+    e.preventDefault();
+    e.stopPropagation();
+    startStickerDrag('scale', s, e);
+    return;
+  }
+  if (e.target.classList.contains('sticker-move-surface') || e.target.classList.contains('sticker-widget-outline')) {
+    e.preventDefault();
+    e.stopPropagation();
+    state.stickers.selectedId = id;
+    renderStickerPanel();
+    startStickerDrag('move', s, e);
+  }
+}
+
+function renderStickerManipLayer() {
+  const layer = document.getElementById('stickerManipLayer');
+  if (!layer) return;
+  const show = state.activeTool === 'sticker' && state.stickers.selectedId;
+  layer.classList.toggle('interactive', !!show);
+  layer.setAttribute('aria-hidden', show ? 'false' : 'true');
+  if (!show) {
+    layer.innerHTML = '';
+    return;
+  }
+  const s = getStickerById(state.stickers.selectedId);
+  if (!s || !s.visible) {
+    layer.innerHTML = '';
+    return;
+  }
+
+  const bw = s.baseW || 96;
+  const bh = s.baseH || 96;
+  const w = bw * s.scale;
+  const h = bh * s.scale;
+  const deg = (s.rotation * 180) / Math.PI;
+
+  layer.innerHTML = `
+    <div class="sticker-widget" style="left:${s.x}px;top:${s.y}px;" data-sticker-id="${s.id}">
+      <div class="sticker-widget-inner" style="width:${w}px;height:${h}px;transform:rotate(${deg}deg);">
+        <img class="sticker-widget-img" src="${escapeHtml(s.src)}" alt="">
+        <div class="sticker-widget-outline"></div>
+        <div class="sticker-move-surface"></div>
+        <button type="button" class="sticker-handle sticker-rotate" aria-label="Rotate sticker">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5a7 7 0 1 1-4 12"/><path d="M12 5V2M12 5H9"/></svg>
+        </button>
+        <button type="button" class="sticker-handle sticker-scale" aria-label="Resize sticker">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17L17 7M17 7h-5M17 7v5M7 17h5M7 17v-5"/></svg>
+        </button>
+      </div>
+    </div>
+  `;
+}
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -5613,6 +6109,8 @@ updateBrushPreviews();
 renderPalette();
 renderMakeupPanel();
 if (typeof compositeAllLayersToDisplay === 'function') compositeAllLayersToDisplay();
+if (typeof bindStickerManipLayerOnce === 'function') bindStickerManipLayerOnce();
+if (typeof bindStickerFileInputOnce === 'function') bindStickerFileInputOnce();
 </script>
 </body>
 </html>
