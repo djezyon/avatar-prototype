@@ -4440,6 +4440,7 @@ function attachMakeupHandlers() {
         if (e.target.closest('[data-action]') && e.target.closest('[data-action]') !== el) return;
         const g = state.makeup.groups.find(x => x.id === groupId);
         if (g) {
+          state.makeup.selectedLayerRef = null;
           state.makeup.selectedGroupId = groupId;
           g.expanded = !g.expanded;
           renderMakeupPanel();
@@ -4451,6 +4452,7 @@ function attachMakeupHandlers() {
         e.stopPropagation();
         const g = state.makeup.groups.find(x => x.id === groupId);
         if (g) {
+          state.makeup.selectedLayerRef = null;
           state.makeup.selectedGroupId = groupId;
           g.expanded = !g.expanded;
           renderMakeupPanel();
@@ -4632,7 +4634,7 @@ function attachLayerDragHandlers() {
       if (zone.dataset.dropGroup !== dragState.groupId) return;
       e.preventDefault();
       const targetGroupId = zone.dataset.dropGroup;
-      const targetIndex = parseInt(zone.dataset.dropIndex);
+      const targetIndex = parseInt(zone.dataset.dropIndex, 10);
       moveLayer(dragState.groupId, dragState.layerId, targetGroupId, targetIndex);
       zone.classList.remove('over');
     });
@@ -4657,6 +4659,7 @@ function attachLayerDragHandlers() {
         kind: 'group',
         groupId: card.dataset.groupId,
       };
+      state.makeup.selectedLayerRef = null;
       state.makeup.selectedGroupId = card.dataset.groupId;
       makeupPanelEl.querySelectorAll('.group-header.selected').forEach(h => h.classList.remove('selected'));
       header.classList.add('selected');
@@ -4709,6 +4712,7 @@ function moveLayer(srcGroupId, srcLayerId, targetGroupId, targetIndex) {
 
   const srcIdx = srcGroup.layers.findIndex(l => l.id === srcLayerId);
   if (srcIdx < 0) return;
+  if (!Number.isFinite(targetIndex)) return;
   const layer = srcGroup.layers[srcIdx];
 
   // No-op if dropping at same position
@@ -5062,6 +5066,10 @@ function doDuplicateLayer(ctx) {
   }
   const g = state.makeup.groups.find(x => x.id === ctx.groupId);
   if (!g) return;
+  if (g.layers.length >= 3) {
+    showToast('Layer limit under group is 3');
+    return;
+  }
   const idx = g.layers.findIndex(x => x.id === ctx.layerId);
   if (idx < 0) return;
   const orig = g.layers[idx];
@@ -5211,6 +5219,10 @@ function doAddLayer(ctx) {
   }
   const g = state.makeup.groups.find(x => x.id === ctx.groupId);
   if (!g) return;
+  if (g.layers.length >= 3) {
+    showToast('Layer limit under group is 3');
+    return;
+  }
 
   const layerNum = state.makeup.nextLayerNum++;
   const layerId = `l_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
