@@ -1323,6 +1323,209 @@ input[type="range"]::-moz-range-thumb {
 .menu-popup-backdrop.visible { display: block; }
 
 /* ============================================================
+   MODE PICKER MODAL (first-time brush flow)
+   ============================================================ */
+.mode-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(5, 6, 10, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out), visibility var(--dur-fast) var(--ease-out);
+}
+.mode-picker-backdrop.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.mode-picker-dialog {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface-card);
+  border-radius: 18px;
+  border: 1px solid rgba(208, 217, 251, 0.1);
+  padding: 22px 20px 20px;
+  box-shadow:
+    0 2px 4px rgba(4, 4, 8, 0.25),
+    0 10px 24px rgba(4, 4, 8, 0.35),
+    0 24px 48px rgba(4, 4, 8, 0.45);
+  transform: scale(0.98);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.mode-picker-backdrop.visible .mode-picker-dialog {
+  transform: scale(1);
+}
+.mode-picker-title {
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 18px;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.mode-picker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.mode-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-display);
+  color: inherit;
+  transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.mode-card:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+.mode-card:active { transform: scale(0.98); }
+.mode-card-art {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  border-radius: 12px;
+  background: #1a1c20;
+  overflow: hidden;
+}
+.mode-card-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mode-card-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.mode-card.selected .mode-card-check {
+  opacity: 1;
+}
+.mode-card.selected {
+  box-shadow: 0 0 0 2px #fff;
+  border-radius: 14px;
+}
+.mode-card-text {
+  padding: 10px 2px 0;
+}
+.mode-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.mode-card-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+.mode-card-check svg {
+  width: 14px;
+  height: 14px;
+  stroke: #111;
+}
+.mode-start-btn {
+  width: 100%;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-blue);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.mode-start-btn:hover { background: var(--brand-blue-hover); }
+.mode-start-btn:active { transform: scale(0.99); }
+
+/* Top Regional / Full Face pill */
+.mode-toggle {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: rgba(20, 20, 24, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    visibility var(--dur-fast) var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+.mode-toggle.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.phone-screen.tray-open .mode-toggle {
+  transform: translateX(calc(-50% - calc(var(--tray-w) / 2)));
+}
+.mode-segment {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+}
+.mode-segment.active {
+  background: var(--brand-blue);
+  color: #fff;
+}
+.mode-segment:not(.active):hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ============================================================
    TOP BAR — tray-aware behavior
    ============================================================ */
 /* ============================================================
@@ -2009,6 +2212,73 @@ input[type="range"]::-moz-range-thumb {
       </div>
     </aside>
 
+    <!-- REGIONAL / FULL FACE MODE PILL (brush group active) -->
+    <div id="modeToggle" class="mode-toggle" aria-hidden="true">
+      <button type="button" class="mode-segment active" data-mode="regional">Regional</button>
+      <button type="button" class="mode-segment" data-mode="fullface">Full Face</button>
+    </div>
+
+    <!-- FIRST-TIME BRUSH MODE PICKER -->
+    <div class="mode-picker-backdrop" id="modePickerOverlay" aria-hidden="true">
+      <div class="mode-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="modePickerTitle">
+        <h2 class="mode-picker-title" id="modePickerTitle">How do you want to create the makeup?</h2>
+        <div class="mode-picker-grid">
+          <button type="button" class="mode-card selected" data-mode="regional">
+            <div class="mode-card-art">
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <ellipse cx="50" cy="52" rx="28" ry="34" stroke="rgba(255,255,255,0.25)" stroke-width="1.2"/>
+                <ellipse cx="38" cy="44" rx="10" ry="7" stroke="#fff" stroke-width="1" stroke-dasharray="3 2" fill="rgba(180,120,220,0.35)"/>
+                <ellipse cx="62" cy="44" rx="10" ry="7" stroke="#fff" stroke-width="1" stroke-dasharray="3 2" fill="rgba(180,120,220,0.35)"/>
+                <path d="M38 68 Q50 62 62 68 Q50 78 38 68" stroke="#fff" stroke-width="1" stroke-dasharray="3 2" fill="rgba(220,100,160,0.4)"/>
+              </svg>
+            </div>
+            <span class="mode-card-check" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>
+            <div class="mode-card-text">
+              <div class="mode-card-title">Regional Makeup</div>
+              <div class="mode-card-sub">You design per region</div>
+            </div>
+          </button>
+          <button type="button" class="mode-card" data-mode="fullface">
+            <div class="mode-card-art">
+              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                  <clipPath id="modeFaceClip"><ellipse cx="50" cy="52" rx="28" ry="34"/></clipPath>
+                  <linearGradient id="modeFlagGrad" x1="22" y1="36" x2="78" y2="78" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#b22234"/>
+                    <stop offset="18%" stop-color="#b22234"/>
+                    <stop offset="18%" stop-color="#fff"/>
+                    <stop offset="36%" stop-color="#fff"/>
+                    <stop offset="36%" stop-color="#b22234"/>
+                    <stop offset="54%" stop-color="#b22234"/>
+                    <stop offset="54%" stop-color="#fff"/>
+                    <stop offset="72%" stop-color="#fff"/>
+                    <stop offset="72%" stop-color="#b22234"/>
+                    <stop offset="100%" stop-color="#3c3b6e"/>
+                  </linearGradient>
+                </defs>
+                <g clip-path="url(#modeFaceClip)">
+                  <ellipse cx="50" cy="52" rx="28" ry="34" fill="url(#modeFlagGrad)"/>
+                  <rect x="22" y="36" width="18" height="16" fill="#3c3b6e"/>
+                  <path fill="#fff" d="M26 40l1 2h2l-1.6 1.2.6 2-1.6-1.2L25 45.2l.6-2L24 42h2zm5 0l1 2h2l-1.6 1.2.6 2-1.6-1.2L30 45.2l.6-2L29 42h2zm5 0l1 2h2l-1.6 1.2.6 2-1.6-1.2L35 45.2l.6-2L34 42h2zm-5 5l1 2h2l-1.6 1.2.6 2-1.6-1.2L30 50.2l.6-2L29 47h2zm5 0l1 2h2l-1.6 1.2.6 2-1.6-1.2L35 50.2l.6-2L34 47h2z"/>
+                </g>
+                <ellipse cx="50" cy="52" rx="28" ry="34" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1"/>
+              </svg>
+            </div>
+            <span class="mode-card-check" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>
+            <div class="mode-card-text">
+              <div class="mode-card-title">Full-Face Makeup</div>
+              <div class="mode-card-sub">We auto separate layers</div>
+            </div>
+          </button>
+        </div>
+        <button type="button" class="mode-start-btn" id="modePickerStart">Start</button>
+      </div>
+    </div>
+
     <!-- AVATAR PREVIEW SCREEN -->
     <div class="preview-screen" id="previewScreen">
       <!-- Background image (optional — only shows if file exists; falls back to gradient) -->
@@ -2117,6 +2387,9 @@ const state = {
   activeTool: null,
   brushSelected: false,
   stickerSelected: false,
+  drawing: {
+    mode: 'regional', // 'regional' | 'fullface'
+  },
   // Brush settings
   brushSize: 12,
   brushSoftness: 20,
@@ -2490,12 +2763,53 @@ const toolTitles = {
 const eraserBtn = document.querySelector('[data-tool="eraser"]');
 const patternBtn = document.querySelector('[data-tool="pattern"]');
 const bottomToolbar = document.getElementById('bottomToolbar');
+const modeToggle = document.getElementById('modeToggle');
+const modePickerOverlay = document.getElementById('modePickerOverlay');
+const modePickerDialog = modePickerOverlay && modePickerOverlay.querySelector('.mode-picker-dialog');
+
+function updateModeTogglePill() {
+  if (!modeToggle) return;
+  const showPill = (state.activeTool === 'brush' || state.activeTool === 'eraser');
+  modeToggle.classList.toggle('visible', showPill);
+  modeToggle.setAttribute('aria-hidden', showPill ? 'false' : 'true');
+  modeToggle.querySelectorAll('.mode-segment').forEach(seg => {
+    seg.classList.toggle('active', seg.dataset.mode === state.drawing.mode);
+  });
+}
+
+function showModePicker() {
+  if (!modePickerOverlay) return;
+  modePickerOverlay.classList.add('visible');
+  modePickerOverlay.setAttribute('aria-hidden', 'false');
+  modePickerOverlay.querySelectorAll('.mode-card').forEach(card => {
+    card.classList.toggle('selected', card.dataset.mode === 'regional');
+  });
+}
+
+function hideModePicker() {
+  if (!modePickerOverlay) return;
+  modePickerOverlay.classList.remove('visible');
+  modePickerOverlay.setAttribute('aria-hidden', 'true');
+}
 
 function selectTool(tool, opts = {}) {
   // Same tool tapped → close
   if (state.activeTool === tool) {
     deselectAll();
     return;
+  }
+
+  // First-time brush tap → mode picker modal (unless continuing after commit/dismiss)
+  if (tool === 'brush' && !opts._afterModePicker) {
+    const chosen = localStorage.getItem('brushModeChosen');
+    if (!chosen) {
+      showModePicker();
+      return;
+    }
+    const savedMode = localStorage.getItem('drawMode');
+    if (savedMode === 'fullface' || savedMode === 'regional') {
+      state.drawing.mode = savedMode;
+    }
   }
 
   // Update conditional visibility based on parent tool
@@ -2558,6 +2872,8 @@ function selectTool(tool, opts = {}) {
   Object.values(panels).forEach(p => p.classList.remove('active'));
   panels[tool].classList.add('active');
   trayTitle.textContent = toolTitles[tool];
+
+  updateModeTogglePill();
 }
 
 function deselectAll() {
@@ -2572,6 +2888,8 @@ function deselectAll() {
   tray.classList.remove('open');
   bottomToolbar.classList.remove('tray-open');
   document.querySelector('.phone-screen').classList.remove('tray-open');
+
+  updateModeTogglePill();
 }
 
 toolButtons.forEach(btn => {
@@ -2579,6 +2897,56 @@ toolButtons.forEach(btn => {
 });
 
 document.getElementById('trayCloseBtn').addEventListener('click', deselectAll);
+
+if (modePickerOverlay) {
+  if (modePickerDialog) {
+    modePickerDialog.addEventListener('click', (e) => e.stopPropagation());
+  }
+  modePickerOverlay.addEventListener('click', () => {
+    state.drawing.mode = 'regional';
+    hideModePicker();
+    selectTool('brush', { _afterModePicker: true });
+  });
+  const modePickerStartBtn = document.getElementById('modePickerStart');
+  if (modePickerStartBtn) {
+    modePickerStartBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const selected = modePickerOverlay.querySelector('.mode-card.selected');
+      const mode = selected ? selected.dataset.mode : 'regional';
+      state.drawing.mode = mode;
+      localStorage.setItem('brushModeChosen', 'true');
+      localStorage.setItem('drawMode', mode);
+      hideModePicker();
+      selectTool('brush', { _afterModePicker: true });
+    });
+  }
+  modePickerOverlay.querySelectorAll('.mode-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      modePickerOverlay.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+    });
+  });
+}
+if (modeToggle) {
+  modeToggle.querySelectorAll('.mode-segment').forEach(seg => {
+    seg.addEventListener('click', () => {
+      const mode = seg.dataset.mode;
+      if (!mode || mode === state.drawing.mode) return;
+      state.drawing.mode = mode;
+      localStorage.setItem('drawMode', mode);
+      updateModeTogglePill();
+      showToast(mode === 'fullface' ? 'Full Face mode' : 'Regional mode');
+    });
+  });
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!modePickerOverlay || !modePickerOverlay.classList.contains('visible')) return;
+  state.drawing.mode = 'regional';
+  hideModePicker();
+  selectTool('brush', { _afterModePicker: true });
+});
 
 /* ============================================================
    TOGGLES
