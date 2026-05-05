@@ -928,6 +928,29 @@ input[type="range"]::-moz-range-thumb {
   gap: 0;
   padding-top: 4px;
 }
+.makeup-mode-inline {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.makeup-mode-inline .mode-segment {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.makeup-mode-inline .mode-segment.active {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+.makeup-mode-inline .mode-segment:not(.active):hover {
+  background: rgba(255,255,255,0.06);
+}
 /* Restore spacing between major sections (progress row, empty cards, headings, etc.)
    but NOT between group cards and their drop zones — those control their own spacing. */
 .makeup-panel > * + * { margin-top: 14px; }
@@ -943,6 +966,28 @@ input[type="range"]::-moz-range-thumb {
   align-items: center;
   gap: 12px;
   padding: 4px 4px 6px 4px;
+}
+.makeup-items-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 4px;
+}
+.makeup-items-copy {
+  flex: 1;
+  min-width: 0;
+}
+.makeup-items-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.makeup-items-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.3;
 }
 .progress-track {
   flex: 1;
@@ -4161,7 +4206,28 @@ function renderMakeupPanel() {
 
   let html = '';
 
-  // Progress row — thin pill bar + "X/6 Layers Applied" label + "+" button
+  const regionalActive = state.drawing.mode === 'regional' ? 'active' : '';
+  const fullfaceActive = state.drawing.mode === 'fullface' ? 'active' : '';
+  html += `
+    <div class="makeup-mode-inline">
+      <button type="button" class="mode-segment ${regionalActive}" data-action="makeup-mode" data-mode="regional">Regional mode</button>
+      <button type="button" class="mode-segment ${fullfaceActive}" data-action="makeup-mode" data-mode="fullface">Full face mode</button>
+    </div>
+  `;
+
+  html += `
+    <div class="makeup-items-header">
+      <div class="makeup-items-copy">
+        <div class="makeup-items-title">Makeup items</div>
+        <div class="makeup-items-subtitle">You can create up to ${MAKEUP_MAX_GROUPS} makeup items</div>
+      </div>
+      <button class="progress-add" id="progressAddBtn" ${groupCount >= MAKEUP_MAX_GROUPS ? 'disabled' : ''} aria-label="Add makeup item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+  `;
+
+  // Progress row — thin pill bar + "X/6 Layers Applied" label
   const pct = (groupCount / MAKEUP_MAX_GROUPS) * 100;
   html += `
     <div class="progress-row">
@@ -4169,9 +4235,6 @@ function renderMakeupPanel() {
         <div class="progress-fill" style="width:${pct}%;"></div>
       </div>
       <div class="progress-label">${groupCount}/${MAKEUP_MAX_GROUPS} Layers Applied</div>
-      <button class="progress-add" id="progressAddBtn" ${groupCount >= MAKEUP_MAX_GROUPS ? 'disabled' : ''} aria-label="Add">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
     </div>
   `;
 
@@ -4329,6 +4392,22 @@ function attachMakeupHandlers() {
       return;
     }
     openMenuPopup(progAdd, 'all');
+  });
+
+  makeupPanelEl.querySelectorAll('[data-action="makeup-mode"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      if (!mode || mode === state.drawing.mode) return;
+      if (mode === 'fullface' && !canEnableFullFaceMode()) {
+        showToast('Full Face needs one Face, Eyes, and Lips group each');
+        return;
+      }
+      state.drawing.mode = mode;
+      localStorage.setItem('drawMode', mode);
+      updateModeTogglePill();
+      maybeToastRegionalLayerPrompt();
+      renderMakeupPanel();
+    });
   });
 
   // Empty state CTAs
