@@ -1044,25 +1044,55 @@ input[type="range"]::-moz-range-thumb {
 .cost-pill {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 6px 3px 4px;
-  border-radius: 6px;
-  background: rgba(255,255,255,0.06);
+  gap: 6px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: opacity var(--dur-fast) var(--ease-out);
   border: none;
   font-family: var(--font-display);
 }
-.cost-pill:hover { background: rgba(255,255,255,0.1); }
+.cost-pill:hover { opacity: 0.78; }
 .cost-hex {
-  width: 14px; height: 14px;
+  width: 16px; height: 16px;
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--brand-blue);
 }
-.cost-pill svg.chevron { width: 12px; height: 12px; opacity: 0.6; }
+.cost-hex img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.cost-pill .cost-value {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+.group-chevron {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+.group-chevron:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.08);
+}
+.group-chevron svg {
+  width: 14px;
+  height: 14px;
+}
 
 .checkbox {
   width: 22px;
@@ -3835,7 +3865,9 @@ function renderMakeupPanel() {
 function renderGroupCard(g) {
   const meta = MAKEUP_GROUP_TYPES[g.type];
   const expandedClass = g.expanded ? '' : 'collapsed';
-  const chevronRotate = g.expanded ? '180deg' : '0deg';
+  const chevronIcon = g.expanded
+    ? '<path d="M6 9l6 6 6-6"/>'
+    : '<path d="M15 6l-6 6 6 6"/>';
   const groupSel = state.makeup.selectedGroupId === g.id;
   let body = '';
   if (g.expanded) {
@@ -3887,10 +3919,12 @@ function renderGroupCard(g) {
         <img class="group-chip" src="./assets/chips/Property_1_${g.type === 'face' ? 'Face' : g.type === 'eye' ? 'Eyes' : 'Lips'}.svg" alt="${meta.label}">
         <button class="cost-pill" data-action="group-cost" data-group-id="${g.id}">
           <span class="cost-hex">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L21 7v10l-9 5-9-5V7z"/></svg>
+            <img src="./assets/icons/roblox_logo.png" alt="">
           </span>
-          <span>${meta.basePrice}</span>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="transform: rotate(${chevronRotate}); transition: transform 200ms;"><path d="M6 9l6 6 6-6"/></svg>
+          <span class="cost-value">${meta.basePrice}</span>
+        </button>
+        <button class="group-chevron" data-action="group-toggle-arrow" data-group-id="${g.id}" aria-label="${g.expanded ? 'Collapse group' : 'Expand group'}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">${chevronIcon}</svg>
         </button>
         <div class="checkbox ${g.visible ? 'checked' : ''}" data-action="group-vis" data-group-id="${g.id}"></div>
         <button class="group-action" data-action="group-menu" data-group-id="${g.id}" aria-label="Group options">
@@ -3962,6 +3996,17 @@ function attachMakeupHandlers() {
         }
       });
     }
+    if (action === 'group-toggle-arrow') {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const g = state.makeup.groups.find(x => x.id === groupId);
+        if (g) {
+          state.makeup.selectedGroupId = groupId;
+          g.expanded = !g.expanded;
+          renderMakeupPanel();
+        }
+      });
+    }
     if (action === 'group-vis') {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -3972,7 +4017,9 @@ function attachMakeupHandlers() {
     if (action === 'group-cost') {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        showToast('Cost details — coming next');
+        const g = state.makeup.groups.find(x => x.id === groupId);
+        const amount = g ? MAKEUP_GROUP_TYPES[g.type].basePrice : 90;
+        showToast(`${amount} robux will be charged when check out`);
       });
     }
     if (action === 'group-menu') {
