@@ -2470,6 +2470,55 @@ function isInsideHead(x, y) {
   return dx*dx + dy*dy <= 1;
 }
 
+function getSelectedMakeupGroupType() {
+  const ref = state.makeup.selectedLayerRef;
+  if (!ref) return null;
+  const g = state.makeup.groups.find(x => x.id === ref.groupId);
+  return g ? g.type : null;
+}
+
+function getInsideNormalizedEllipse(x, y, cx, cy, rx, ry) {
+  const dx = (x - cx) / rx;
+  const dy = (y - cy) / ry;
+  return dx * dx + dy * dy <= 1;
+}
+
+function isInsideRegionalZone(x, y) {
+  const rect = canvas.getBoundingClientRect();
+  const regionType = getSelectedMakeupGroupType();
+  const headCx = rect.width * 0.5;
+  const headCy = rect.height * 0.42;
+  const headRx = rect.width * 0.11;
+  const headRy = rect.height * 0.34;
+
+  if (!regionType || regionType === 'face') {
+    return getInsideNormalizedEllipse(x, y, headCx, headCy, headRx, headRy);
+  }
+  if (regionType === 'eye') {
+    const eyeRy = headRy * 0.17;
+    const eyeRx = headRx * 0.36;
+    const eyeCy = headCy - headRy * 0.2;
+    const leftEyeCx = headCx - headRx * 0.45;
+    const rightEyeCx = headCx + headRx * 0.45;
+    return (
+      getInsideNormalizedEllipse(x, y, leftEyeCx, eyeCy, eyeRx, eyeRy) ||
+      getInsideNormalizedEllipse(x, y, rightEyeCx, eyeCy, eyeRx, eyeRy)
+    );
+  }
+  if (regionType === 'lips') {
+    const lipsRx = headRx * 0.5;
+    const lipsRy = headRy * 0.12;
+    const lipsCy = headCy + headRy * 0.36;
+    return getInsideNormalizedEllipse(x, y, headCx, lipsCy, lipsRx, lipsRy);
+  }
+  return getInsideNormalizedEllipse(x, y, headCx, headCy, headRx, headRy);
+}
+
+function canPaintAt(x, y) {
+  if (state.drawing.mode === 'fullface') return isInsideHead(x, y);
+  return isInsideRegionalZone(x, y);
+}
+
 /* ============================================================
    COLOR HELPERS
    ============================================================ */
@@ -2521,7 +2570,7 @@ function getEventPos(e) {
 function startStroke(e) {
   if (state.activeTool !== 'brush' && state.activeTool !== 'eraser') return;
   const p = getEventPos(e);
-  if (!isInsideHead(p.x, p.y)) return;
+  if (!canPaintAt(p.x, p.y)) return;
   drawing = true;
   lastPoint = p;
   // Save snapshot for undo
@@ -2534,8 +2583,8 @@ function startStroke(e) {
 function moveStroke(e) {
   if (!drawing) return;
   const p = getEventPos(e);
-  // If we leave the head boundary, treat as lift
-  if (!isInsideHead(p.x, p.y)) {
+  // If we leave the active drawing zone, treat as lift
+  if (!canPaintAt(p.x, p.y)) {
     lastPoint = null;
     return;
   }
@@ -2554,10 +2603,26 @@ function endStroke() {
 
 function drawSegment(from, to) {
   ctx.save();
-  // Clip to head
+  // Clip to draw zone (full face vs regional)
   const rect = canvas.getBoundingClientRect();
+  const headCx = rect.width * 0.5;
+  const headCy = rect.height * 0.42;
+  const headRx = rect.width * 0.11;
+  const headRy = rect.height * 0.34;
+  const regionType = getSelectedMakeupGroupType();
+
   ctx.beginPath();
-  ctx.ellipse(rect.width * 0.5, rect.height * 0.42, rect.width * 0.11, rect.height * 0.34, 0, 0, Math.PI*2);
+  if (state.drawing.mode === 'regional' && regionType === 'eye') {
+    const eyeRy = headRy * 0.17;
+    const eyeRx = headRx * 0.36;
+    const eyeCy = headCy - headRy * 0.2;
+    ctx.ellipse(headCx - headRx * 0.45, eyeCy, eyeRx, eyeRy, 0, 0, Math.PI * 2);
+    ctx.ellipse(headCx + headRx * 0.45, eyeCy, eyeRx, eyeRy, 0, 0, Math.PI * 2);
+  } else if (state.drawing.mode === 'regional' && regionType === 'lips') {
+    ctx.ellipse(headCx, headCy + headRy * 0.36, headRx * 0.5, headRy * 0.12, 0, 0, Math.PI * 2);
+  } else {
+    ctx.ellipse(headCx, headCy, headRx, headRy, 0, 0, Math.PI * 2);
+  }
   ctx.clip();
 
   // Check if the active layer has alpha lock enabled
@@ -2769,7 +2834,11 @@ const modePickerDialog = modePickerOverlay && modePickerOverlay.querySelector('.
 
 function updateModeTogglePill() {
   if (!modeToggle) return;
-  const showPill = (state.activeTool === 'brush' || state.activeTool === 'eraser');
+  const showPill = (
+    state.activeTool === 'brush' ||
+    state.activeTool === 'eraser' ||
+    state.activeTool === 'makeup'
+  );
   modeToggle.classList.toggle('visible', showPill);
   modeToggle.setAttribute('aria-hidden', showPill ? 'false' : 'true');
   modeToggle.querySelectorAll('.mode-segment').forEach(seg => {
