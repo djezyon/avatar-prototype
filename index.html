@@ -4318,7 +4318,12 @@ function renderGroupCard(g) {
   const chevronIcon = g.expanded
     ? '<path d="M6 9l6 6 6-6"/>'
     : '<path d="M15 6l-6 6 6 6"/>';
-  const groupSel = state.makeup.selectedGroupId === g.id;
+  const hasSelectedLayerInGroup = !!(
+    state.makeup.selectedLayerRef &&
+    state.makeup.selectedLayerRef.groupId === g.id
+  );
+  // Procreate-like behavior: if a sub-layer is selected, only that row is highlighted.
+  const groupSel = state.makeup.selectedGroupId === g.id && !hasSelectedLayerInGroup;
   let body = '';
   if (g.expanded) {
     g.layers.forEach((l, layerIdx) => {
