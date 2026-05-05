@@ -701,6 +701,38 @@ input[type="range"]::-moz-range-progress {
   box-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
 
+/* Slider alignment: eraser + makeup opacity only — match #panel-brush range; do not alter other UI. */
+#panel-eraser input[type="range"],
+.layer-settings input.opacity-slider {
+  height: 13.5px;
+}
+#panel-eraser input[type="range"]::-webkit-slider-runnable-track,
+.layer-settings input.opacity-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+}
+#panel-eraser input[type="range"]::-webkit-slider-thumb,
+.layer-settings input.opacity-slider::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+}
+#panel-eraser input[type="range"]::-moz-range-track,
+.layer-settings input.opacity-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+}
+#panel-eraser input[type="range"]::-moz-range-thumb,
+.layer-settings input.opacity-slider::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
 /* Brush Type / Texture combobox (Figma-style) */
 .brush-combo-label {
   font-size: 13px;
