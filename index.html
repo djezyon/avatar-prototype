@@ -2454,20 +2454,52 @@ function resizeCanvas() {
     img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
     img.src = saved;
   }
+  if (typeof syncAllLayerSurfaceSizes === 'function') syncAllLayerSurfaceSizes();
 }
 window.addEventListener('resize', resizeCanvas);
 setTimeout(resizeCanvas, 50);
 
-/* Head clipping mask — rough ellipse roughly matching the face position in the bg */
+/* ---------- Face mask geometry (v1 ellipses — refine later) ---------- */
+function getFaceGeometry(rect) {
+  const headCx = rect.width * 0.5;
+  const headCy = rect.height * 0.42;
+  const headRx = rect.width * 0.11;
+  const headRy = rect.height * 0.34;
+  const eyeRy = headRy * 0.17;
+  const eyeRx = headRx * 0.36;
+  const eyeCy = headCy - headRy * 0.2;
+  const leftEyeCx = headCx - headRx * 0.45;
+  const rightEyeCx = headCx + headRx * 0.45;
+  const lipsRx = headRx * 0.5;
+  const lipsRy = headRy * 0.12;
+  const lipsCy = headCy + headRy * 0.36;
+  return { headCx, headCy, headRx, headRy, eyeRy, eyeRx, eyeCy, leftEyeCx, rightEyeCx, lipsRx, lipsRy, lipsCy };
+}
+
 function isInsideHead(x, y) {
   const rect = canvas.getBoundingClientRect();
-  const cx = rect.width * 0.5;       // head center x
-  const cy = rect.height * 0.42;     // head center y (roughly upper-middle)
-  const rx = rect.width * 0.11;      // head half-width
-  const ry = rect.height * 0.34;     // head half-height
-  const dx = (x - cx) / rx;
-  const dy = (y - cy) / ry;
-  return dx*dx + dy*dy <= 1;
+  const g = getFaceGeometry(rect);
+  return getInsideNormalizedEllipse(x, y, g.headCx, g.headCy, g.headRx, g.headRy);
+}
+
+function isInLipsZonePx(x, y, rect) {
+  const g = getFaceGeometry(rect);
+  return getInsideNormalizedEllipse(x, y, g.headCx, g.lipsCy, g.lipsRx, g.lipsRy);
+}
+function isInEyesZonePx(x, y, rect) {
+  const g = getFaceGeometry(rect);
+  return (
+    getInsideNormalizedEllipse(x, y, g.leftEyeCx, g.eyeCy, g.eyeRx, g.eyeRy) ||
+    getInsideNormalizedEllipse(x, y, g.rightEyeCx, g.eyeCy, g.eyeRx, g.eyeRy)
+  );
+}
+
+function inferRegionTypeAtPoint(x, y) {
+  const rect = canvas.getBoundingClientRect();
+  if (isInLipsZonePx(x, y, rect)) return 'lips';
+  if (isInEyesZonePx(x, y, rect)) return 'eye';
+  if (isInsideHead(x, y)) return 'face';
+  return 'face';
 }
 
 function getSelectedMakeupGroupType() {
@@ -2486,37 +2518,209 @@ function getInsideNormalizedEllipse(x, y, cx, cy, rx, ry) {
 function isInsideRegionalZone(x, y) {
   const rect = canvas.getBoundingClientRect();
   const regionType = getSelectedMakeupGroupType();
-  const headCx = rect.width * 0.5;
-  const headCy = rect.height * 0.42;
-  const headRx = rect.width * 0.11;
-  const headRy = rect.height * 0.34;
+  const g = getFaceGeometry(rect);
 
   if (!regionType || regionType === 'face') {
-    return getInsideNormalizedEllipse(x, y, headCx, headCy, headRx, headRy);
+    return getInsideNormalizedEllipse(x, y, g.headCx, g.headCy, g.headRx, g.headRy);
   }
   if (regionType === 'eye') {
-    const eyeRy = headRy * 0.17;
-    const eyeRx = headRx * 0.36;
-    const eyeCy = headCy - headRy * 0.2;
-    const leftEyeCx = headCx - headRx * 0.45;
-    const rightEyeCx = headCx + headRx * 0.45;
     return (
-      getInsideNormalizedEllipse(x, y, leftEyeCx, eyeCy, eyeRx, eyeRy) ||
-      getInsideNormalizedEllipse(x, y, rightEyeCx, eyeCy, eyeRx, eyeRy)
+      getInsideNormalizedEllipse(x, y, g.leftEyeCx, g.eyeCy, g.eyeRx, g.eyeRy) ||
+      getInsideNormalizedEllipse(x, y, g.rightEyeCx, g.eyeCy, g.eyeRx, g.eyeRy)
     );
   }
   if (regionType === 'lips') {
-    const lipsRx = headRx * 0.5;
-    const lipsRy = headRy * 0.12;
-    const lipsCy = headCy + headRy * 0.36;
-    return getInsideNormalizedEllipse(x, y, headCx, lipsCy, lipsRx, lipsRy);
+    return getInsideNormalizedEllipse(x, y, g.headCx, g.lipsCy, g.lipsRx, g.lipsRy);
   }
-  return getInsideNormalizedEllipse(x, y, headCx, headCy, headRx, headRy);
+  return getInsideNormalizedEllipse(x, y, g.headCx, g.headCy, g.headRx, g.headRy);
 }
 
 function canPaintAt(x, y) {
   if (state.drawing.mode === 'fullface') return isInsideHead(x, y);
   return isInsideRegionalZone(x, y);
+}
+
+/* ---------- Per-layer raster surfaces (composite to drawCanvas) ---------- */
+const layerSurfaces = new Map();
+
+function layerSurfaceKey(groupId, layerId) {
+  return `${groupId}:${layerId}`;
+}
+
+function ensureLayerSurface(groupId, layerId) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = rect.width * dpr;
+  const h = rect.height * dpr;
+  const key = layerSurfaceKey(groupId, layerId);
+  let c = layerSurfaces.get(key);
+  if (!c) {
+    c = document.createElement('canvas');
+    layerSurfaces.set(key, c);
+  }
+  if (c.width !== w || c.height !== h) {
+    const oldData = c.width > 0 ? c.toDataURL() : null;
+    c.width = w;
+    c.height = h;
+    const sctx = c.getContext('2d');
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.scale(dpr, dpr);
+    if (oldData) {
+      const img = new Image();
+      img.onload = () => {
+        sctx.drawImage(img, 0, 0, rect.width, rect.height);
+        compositeAllLayersToDisplay();
+      };
+      img.src = oldData;
+    }
+  }
+  return c;
+}
+
+function syncAllLayerSurfaceSizes() {
+  for (const key of [...layerSurfaces.keys()]) {
+    const [groupId, layerId] = key.split(':');
+    ensureLayerSurface(groupId, layerId);
+  }
+  compositeAllLayersToDisplay();
+}
+
+function compositeAllLayersToDisplay() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  for (let gi = 0; gi < state.makeup.groups.length; gi++) {
+    const g = state.makeup.groups[gi];
+    if (!g.visible) continue;
+    const gOpac = (g.opacity ?? 100) / 100;
+    for (let li = g.layers.length - 1; li >= 0; li--) {
+      const layer = g.layers[li];
+      if (!layer.visible) continue;
+      const surf = layerSurfaces.get(layerSurfaceKey(g.id, layer.id));
+      if (!surf) continue;
+      ctx.save();
+      ctx.globalAlpha = gOpac;
+      ctx.drawImage(surf, 0, 0, rect.width, rect.height);
+      ctx.restore();
+    }
+  }
+}
+
+function countGroupsByType() {
+  const c = { face: 0, eye: 0, lips: 0 };
+  for (const g of state.makeup.groups) {
+    if (c[g.type] !== undefined) c[g.type]++;
+  }
+  return c;
+}
+
+function canEnableFullFaceMode() {
+  const c = countGroupsByType();
+  return c.face === 1 && c.eye === 1 && c.lips === 1;
+}
+
+function getCanonicalFullFaceLayerRefs() {
+  const faceG = state.makeup.groups.find(g => g.type === 'face');
+  const eyeG = state.makeup.groups.find(g => g.type === 'eye');
+  const lipsG = state.makeup.groups.find(g => g.type === 'lips');
+  if (!faceG || !eyeG || !lipsG) return null;
+  const f = faceG.layers[0];
+  const e = eyeG.layers[0];
+  const l = lipsG.layers[0];
+  if (!f || !e || !l) return null;
+  return [
+    { groupId: faceG.id, layerId: f.id, zone: 'face' },
+    { groupId: eyeG.id, layerId: e.id, zone: 'eye' },
+    { groupId: lipsG.id, layerId: l.id, zone: 'lips' },
+  ];
+}
+
+function clipCtxForPaintZone(sctx, rect, zone) {
+  const g = getFaceGeometry(rect);
+  sctx.beginPath();
+  if (zone === 'face') {
+    sctx.ellipse(g.headCx, g.headCy, g.headRx, g.headRy, 0, 0, Math.PI * 2);
+  } else if (zone === 'eye') {
+    sctx.ellipse(g.leftEyeCx, g.eyeCy, g.eyeRx, g.eyeRy, 0, 0, Math.PI * 2);
+    sctx.ellipse(g.rightEyeCx, g.eyeCy, g.eyeRx, g.eyeRy, 0, 0, Math.PI * 2);
+  } else if (zone === 'lips') {
+    sctx.ellipse(g.headCx, g.lipsCy, g.lipsRx, g.lipsRy, 0, 0, Math.PI * 2);
+  }
+  sctx.clip();
+}
+
+function clipCtxForRegionalGroupType(sctx, rect, groupType) {
+  const g = getFaceGeometry(rect);
+  sctx.beginPath();
+  if (groupType === 'eye') {
+    sctx.ellipse(g.leftEyeCx, g.eyeCy, g.eyeRx, g.eyeRy, 0, 0, Math.PI * 2);
+    sctx.ellipse(g.rightEyeCx, g.eyeCy, g.eyeRx, g.eyeRy, 0, 0, Math.PI * 2);
+  } else if (groupType === 'lips') {
+    sctx.ellipse(g.headCx, g.lipsCy, g.lipsRx, g.lipsRy, 0, 0, Math.PI * 2);
+  } else {
+    sctx.ellipse(g.headCx, g.headCy, g.headRx, g.headRy, 0, 0, Math.PI * 2);
+  }
+  sctx.clip();
+}
+
+function ensureGroupForPaint(regionType) {
+  let g = state.makeup.groups.find(x => x.type === regionType);
+  if (!g) {
+    addMakeupGroup(regionType, { applyMaskToLayer1: true, silent: true });
+    g = state.makeup.groups[state.makeup.groups.length - 1];
+  }
+  const layer = g.layers[0];
+  if (!layer.applyMask) {
+    layer.applyMask = true;
+    if (typeof renderMakeupPanel === 'function') renderMakeupPanel();
+  }
+  state.makeup.selectedLayerRef = { groupId: g.id, layerId: layer.id };
+}
+
+function resolvePaintLayerRef(ref) {
+  if (!ref) return null;
+  const g = state.makeup.groups.find(x => x.id === ref.groupId);
+  if (!g || !g.layers[0]) return ref;
+  return { groupId: g.id, layerId: g.layers[0].id };
+}
+
+function pushLayerPaintHistory(refs) {
+  try {
+    const layers = refs.filter(Boolean).map(ref => ({
+      ref,
+      data: ensureLayerSurface(ref.groupId, ref.layerId).toDataURL(),
+    }));
+    state.history.push({ kind: 'layerPaint', layers });
+    if (state.history.length > 30) state.history.shift();
+    state.redoStack = [];
+  } catch (err) {}
+}
+
+function restoreLayerSurfacesFromSnapshot(layers) {
+  if (!layers || layers.length === 0) {
+    compositeAllLayersToDisplay();
+    return;
+  }
+  let pending = layers.length;
+  layers.forEach(({ ref, data }) => {
+    const img = new Image();
+    img.onload = () => {
+      const surf = ensureLayerSurface(ref.groupId, ref.layerId);
+      const sctx = surf.getContext('2d');
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      sctx.setTransform(1, 0, 0, 1, 0, 0);
+      sctx.clearRect(0, 0, surf.width, surf.height);
+      sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      sctx.drawImage(img, 0, 0, rect.width, rect.height);
+      pending--;
+      if (pending === 0) compositeAllLayersToDisplay();
+    };
+    img.src = data;
+  });
 }
 
 /* ============================================================
@@ -2570,12 +2774,28 @@ function getEventPos(e) {
 function startStroke(e) {
   if (state.activeTool !== 'brush' && state.activeTool !== 'eraser') return;
   const p = getEventPos(e);
-  if (!canPaintAt(p.x, p.y)) return;
+
+  if (state.drawing.mode === 'fullface') {
+    if (!canEnableFullFaceMode()) {
+      showToast('Need exactly one Face, Eyes, and Lips group');
+      return;
+    }
+    if (!isInsideHead(p.x, p.y)) return;
+  } else {
+    if (!state.makeup.selectedLayerRef) {
+      const inferred = inferRegionTypeAtPoint(p.x, p.y);
+      ensureGroupForPaint(inferred);
+    }
+    if (!canPaintAt(p.x, p.y)) return;
+  }
+
+  const refsForUndo = state.drawing.mode === 'fullface'
+    ? getCanonicalFullFaceLayerRefs().map(r => ({ groupId: r.groupId, layerId: r.layerId }))
+    : [resolvePaintLayerRef(state.makeup.selectedLayerRef)].filter(Boolean);
+  pushLayerPaintHistory(refsForUndo);
+
   drawing = true;
   lastPoint = p;
-  // Save snapshot for undo
-  pushHistory();
-  // Draw initial dot
   drawSegment(p, p);
   e.preventDefault();
 }
@@ -2583,7 +2803,6 @@ function startStroke(e) {
 function moveStroke(e) {
   if (!drawing) return;
   const p = getEventPos(e);
-  // If we leave the active drawing zone, treat as lift
   if (!canPaintAt(p.x, p.y)) {
     lastPoint = null;
     return;
@@ -2601,79 +2820,84 @@ function endStroke() {
   lastPoint = null;
 }
 
-function drawSegment(from, to) {
-  ctx.save();
-  // Clip to draw zone (full face vs regional)
-  const rect = canvas.getBoundingClientRect();
-  const headCx = rect.width * 0.5;
-  const headCy = rect.height * 0.42;
-  const headRx = rect.width * 0.11;
-  const headRy = rect.height * 0.34;
-  const regionType = getSelectedMakeupGroupType();
-
-  ctx.beginPath();
-  if (state.drawing.mode === 'regional' && regionType === 'eye') {
-    const eyeRy = headRy * 0.17;
-    const eyeRx = headRx * 0.36;
-    const eyeCy = headCy - headRy * 0.2;
-    ctx.ellipse(headCx - headRx * 0.45, eyeCy, eyeRx, eyeRy, 0, 0, Math.PI * 2);
-    ctx.ellipse(headCx + headRx * 0.45, eyeCy, eyeRx, eyeRy, 0, 0, Math.PI * 2);
-  } else if (state.drawing.mode === 'regional' && regionType === 'lips') {
-    ctx.ellipse(headCx, headCy + headRy * 0.36, headRx * 0.5, headRy * 0.12, 0, 0, Math.PI * 2);
-  } else {
-    ctx.ellipse(headCx, headCy, headRx, headRy, 0, 0, Math.PI * 2);
-  }
-  ctx.clip();
-
-  // Check if the active layer has alpha lock enabled
-  const alphaLockOn = isCurrentLayerAlphaLocked();
-
-  if (state.activeTool === 'eraser') {
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.lineWidth = parseInt(document.getElementById('eraserSize').value);
-    ctx.strokeStyle = 'rgba(0,0,0,1)';
-  } else {
-    // Alpha Lock: source-atop only paints where pixels already exist
-    ctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
-    ctx.lineWidth = state.brushSize;
-    ctx.strokeStyle = getCurrentColor();
-    // Softness via shadow blur
-    if (state.brushSoftness > 0) {
-      ctx.shadowColor = getCurrentColor();
-      ctx.shadowBlur = state.brushSoftness * 0.4;
-    }
-    // Metallic: add a subtle white highlight on top
-    if (state.metallic) {
-      ctx.shadowBlur = Math.max(ctx.shadowBlur, 8);
-    }
-  }
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(from.x, from.y);
-  ctx.lineTo(to.x, to.y);
-  ctx.stroke();
-
-  // Metallic sheen pass
-  if (state.activeTool === 'brush' && state.metallic) {
-    ctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth = state.brushSize * 0.35;
-    ctx.shadowBlur = 0;
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y - state.brushSize * 0.15);
-    ctx.lineTo(to.x, to.y - state.brushSize * 0.15);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function isCurrentLayerAlphaLocked() {
-  const ref = state.makeup.selectedLayerRef;
+function isAlphaLockedForRef(ref) {
   if (!ref) return false;
   const g = state.makeup.groups.find(x => x.id === ref.groupId);
   const l = g && g.layers.find(x => x.id === ref.layerId);
   return !!(l && l.alphaLocked);
+}
+
+function paintStrokeOnLayerSurface(from, to, ref, clipFn) {
+  const surf = ensureLayerSurface(ref.groupId, ref.layerId);
+  const sctx = surf.getContext('2d');
+  const rect = canvas.getBoundingClientRect();
+  const alphaLockOn = isAlphaLockedForRef(ref);
+
+  sctx.save();
+  clipFn(sctx, rect);
+
+  if (state.activeTool === 'eraser') {
+    sctx.globalCompositeOperation = 'destination-out';
+    sctx.lineWidth = parseInt(document.getElementById('eraserSize').value, 10);
+    sctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    sctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
+    sctx.lineWidth = state.brushSize;
+    sctx.strokeStyle = getCurrentColor();
+    if (state.brushSoftness > 0) {
+      sctx.shadowColor = getCurrentColor();
+      sctx.shadowBlur = state.brushSoftness * 0.4;
+    }
+    if (state.metallic) {
+      sctx.shadowBlur = Math.max(sctx.shadowBlur || 0, 8);
+    }
+  }
+  sctx.lineCap = 'round';
+  sctx.lineJoin = 'round';
+  sctx.beginPath();
+  sctx.moveTo(from.x, from.y);
+  sctx.lineTo(to.x, to.y);
+  sctx.stroke();
+
+  if (state.activeTool === 'brush' && state.metallic) {
+    sctx.globalCompositeOperation = alphaLockOn ? 'source-atop' : 'source-over';
+    sctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    sctx.lineWidth = state.brushSize * 0.35;
+    sctx.shadowBlur = 0;
+    sctx.beginPath();
+    sctx.moveTo(from.x, from.y - state.brushSize * 0.15);
+    sctx.lineTo(to.x, to.y - state.brushSize * 0.15);
+    sctx.stroke();
+  }
+  sctx.restore();
+}
+
+function drawSegment(from, to) {
+  const rect = canvas.getBoundingClientRect();
+
+  if (state.drawing.mode === 'fullface') {
+    const triple = getCanonicalFullFaceLayerRefs();
+    if (!triple) return;
+    const order = ['face', 'eye', 'lips'];
+    for (const z of order) {
+      const entry = triple.find(t => t.zone === z);
+      paintStrokeOnLayerSurface(from, to, entry, (sctx, r) =>
+        clipCtxForPaintZone(sctx, r, z));
+    }
+  } else {
+    const ref = resolvePaintLayerRef(state.makeup.selectedLayerRef);
+    if (!ref) return;
+    const g = state.makeup.groups.find(x => x.id === ref.groupId);
+    const gt = g ? g.type : 'face';
+    paintStrokeOnLayerSurface(from, to, ref, (sctx, r) =>
+      clipCtxForRegionalGroupType(sctx, r, gt));
+  }
+
+  compositeAllLayersToDisplay();
+}
+
+function isCurrentLayerAlphaLocked() {
+  return isAlphaLockedForRef(state.makeup.selectedLayerRef);
 }
 
 canvas.addEventListener('mousedown', startStroke);
@@ -2716,7 +2940,14 @@ function undo() {
   }
   const entry = state.history.pop();
   // Snapshot current state into redo stack so we can come back
-  if (entry.kind === 'canvas') {
+  if (entry.kind === 'layerPaint') {
+    const redoLayers = entry.layers.map(({ ref }) => ({
+      ref,
+      data: ensureLayerSurface(ref.groupId, ref.layerId).toDataURL(),
+    }));
+    state.redoStack.push({ kind: 'layerPaint', layers: redoLayers });
+    restoreLayerSurfacesFromSnapshot(entry.layers);
+  } else if (entry.kind === 'canvas') {
     try { state.redoStack.push({ kind: 'canvas', data: canvas.toDataURL() }); } catch(e) {}
     const img = new Image();
     img.onload = () => {
@@ -2748,7 +2979,14 @@ function redo() {
     return;
   }
   const entry = state.redoStack.pop();
-  if (entry.kind === 'canvas') {
+  if (entry.kind === 'layerPaint') {
+    const histLayers = entry.layers.map(({ ref }) => ({
+      ref,
+      data: ensureLayerSurface(ref.groupId, ref.layerId).toDataURL(),
+    }));
+    state.history.push({ kind: 'layerPaint', layers: histLayers });
+    restoreLayerSurfacesFromSnapshot(entry.layers);
+  } else if (entry.kind === 'canvas') {
     try { state.history.push({ kind: 'canvas', data: canvas.toDataURL() }); } catch(e) {}
     const img = new Image();
     img.onload = () => {
@@ -2773,10 +3011,27 @@ function redo() {
   }
 }
 
+function pushFullLayerSnapshotHistory() {
+  const refs = [...layerSurfaces.keys()].map(k => {
+    const colon = k.indexOf(':');
+    return { groupId: k.slice(0, colon), layerId: k.slice(colon + 1) };
+  });
+  if (refs.length === 0) return;
+  pushLayerPaintHistory(refs);
+}
+
 function clearCanvas() {
-  pushHistory();
-  const rect = canvas.getBoundingClientRect();
-  ctx.clearRect(0, 0, rect.width, rect.height);
+  pushFullLayerSnapshotHistory();
+  for (const key of [...layerSurfaces.keys()]) {
+    const colon = key.indexOf(':');
+    const surf = layerSurfaces.get(key);
+    const dpr = window.devicePixelRatio || 1;
+    const sctx = surf.getContext('2d');
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.clearRect(0, 0, surf.width, surf.height);
+    sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  compositeAllLayersToDisplay();
 }
 
 document.getElementById('undoBtn').addEventListener('click', undo);
@@ -2880,6 +3135,11 @@ function selectTool(tool, opts = {}) {
     const savedMode = localStorage.getItem('drawMode');
     if (savedMode === 'fullface' || savedMode === 'regional') {
       state.drawing.mode = savedMode;
+      if (savedMode === 'fullface' && !canEnableFullFaceMode()) {
+        state.drawing.mode = 'regional';
+        localStorage.setItem('drawMode', 'regional');
+        showToast('Full Face needs one Face, Eyes, and Lips group each');
+      }
     }
     const cameFromBrushGroup = state.activeTool === 'eraser';
     if (!cameFromBrushGroup) {
@@ -2990,6 +3250,10 @@ if (modePickerOverlay) {
       e.stopPropagation();
       const selected = modePickerOverlay.querySelector('.mode-card.selected');
       const mode = selected ? selected.dataset.mode : 'regional';
+      if (mode === 'fullface' && !canEnableFullFaceMode()) {
+        showToast('You must have one Eye, Lips and Face group each');
+        return;
+      }
       state.drawing.mode = mode;
       maybeToastRegionalLayerPrompt();
       localStorage.setItem('brushModeChosen', 'true');
@@ -3011,6 +3275,10 @@ if (modeToggle) {
     seg.addEventListener('click', () => {
       const mode = seg.dataset.mode;
       if (!mode || mode === state.drawing.mode) return;
+      if (mode === 'fullface' && !canEnableFullFaceMode()) {
+        showToast('You must have one Eye, Lips and Face group each');
+        return;
+      }
       state.drawing.mode = mode;
       localStorage.setItem('drawMode', mode);
       updateModeTogglePill();
@@ -3932,13 +4200,14 @@ function onMenuPick(type, cat) {
   }
 }
 
-function addMakeupGroup(type) {
+function addMakeupGroup(type, opts = {}) {
   const meta = MAKEUP_GROUP_TYPES[type];
   const num = state.makeup.nextGroupNum[type]++;
   const groupId = `g_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
   // First layer in this group
   const layerId = `l_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
   const layerNum = state.makeup.nextLayerNum++;
+  const applyMaskL1 = opts.applyMaskToLayer1 === true;
   // Collapse all other groups so the new one is the focus
   state.makeup.groups.forEach(g => g.expanded = false);
   state.makeup.groups.push({
@@ -3949,12 +4218,12 @@ function addMakeupGroup(type) {
     visible: true,
     expanded: true,
     layers: [
-      { id: layerId, name: `Layer ${layerNum}`, showGuides: true, applyMask: false, visible: true, alphaLocked: false }
+      { id: layerId, name: `Layer ${layerNum}`, showGuides: true, applyMask: applyMaskL1, visible: true, alphaLocked: false }
     ]
   });
   state.makeup.selectedLayerRef = { groupId, layerId };
   renderMakeupPanel();
-  showToast(`Added ${meta.label} ${num}`);
+  if (!opts.silent) showToast(`Added ${meta.label} ${num}`);
 }
 
 function addAccessory(type) {
@@ -4163,25 +4432,23 @@ function doFillLayer(kctx) {
   const g = state.makeup.groups.find(x => x.id === kctx.groupId);
   const l = g && g.layers.find(x => x.id === kctx.layerId);
   if (!l) return;
-  // Push to canvas history (for undo via the top toolbar)
-  pushHistory();
-  // Fill the head ellipse with the current brush color
-  fillHeadAreaWithCurrentColor();
+  pushLayerPaintHistory([{ groupId: kctx.groupId, layerId: kctx.layerId }]);
+  fillLayerRegionWithCurrentColor(kctx.groupId, kctx.layerId);
   showToast(`Filled ${l.name}`);
 }
 
-function fillHeadAreaWithCurrentColor() {
+function fillLayerRegionWithCurrentColor(groupId, layerId) {
+  const g = state.makeup.groups.find(x => x.id === groupId);
+  const gt = g ? g.type : 'face';
+  const surf = ensureLayerSurface(groupId, layerId);
+  const sctx = surf.getContext('2d');
   const rect = canvas.getBoundingClientRect();
-  const ctxx = canvas.getContext('2d');
-  ctxx.save();
-  // Clip to head ellipse
-  ctxx.beginPath();
-  ctxx.ellipse(rect.width * 0.5, rect.height * 0.42,
-               rect.width * 0.11, rect.height * 0.34, 0, 0, Math.PI * 2);
-  ctxx.clip();
-  ctxx.fillStyle = getCurrentColor();
-  ctxx.fillRect(0, 0, rect.width, rect.height);
-  ctxx.restore();
+  sctx.save();
+  clipCtxForRegionalGroupType(sctx, rect, gt);
+  sctx.fillStyle = getCurrentColor();
+  sctx.fillRect(0, 0, rect.width, rect.height);
+  sctx.restore();
+  compositeAllLayersToDisplay();
 }
 
 function doClearLayer(kctx) {
@@ -4192,11 +4459,17 @@ function doClearLayer(kctx) {
   const g = state.makeup.groups.find(x => x.id === kctx.groupId);
   const l = g && g.layers.find(x => x.id === kctx.layerId);
   if (!l) return;
-  // Push history snapshot, then clear
-  pushHistory();
-  const rect = canvas.getBoundingClientRect();
-  const ctxx = canvas.getContext('2d');
-  ctxx.clearRect(0, 0, rect.width, rect.height);
+  pushLayerPaintHistory([{ groupId: kctx.groupId, layerId: kctx.layerId }]);
+  const key = layerSurfaceKey(kctx.groupId, kctx.layerId);
+  const surf = layerSurfaces.get(key);
+  if (surf) {
+    const dpr = window.devicePixelRatio || 1;
+    const sctx = surf.getContext('2d');
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.clearRect(0, 0, surf.width, surf.height);
+    sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  compositeAllLayersToDisplay();
   showToast(`Cleared ${l.name}`);
 }
 
@@ -4517,6 +4790,7 @@ updateAlphaThumb();
 updateBrushPreviews();
 renderPalette();
 renderMakeupPanel();
+if (typeof compositeAllLayersToDisplay === 'function') compositeAllLayersToDisplay();
 </script>
 </body>
 </html>
