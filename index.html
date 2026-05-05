@@ -594,6 +594,14 @@ input[type="range"] {
   height: 4px;
   --slider-pct: 0%;
   --slider-unfilled: #2a2d34;
+  /* Fill lives on the track pseudo-elements only — avoids a thick “block” behind the thumb */
+  background: transparent;
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
   background: linear-gradient(
     to right,
     #F7F7F8 0%,
@@ -601,13 +609,6 @@ input[type="range"] {
     var(--slider-unfilled) var(--slider-pct),
     var(--slider-unfilled) 100%
   );
-  border-radius: 2px;
-  outline: none;
-}
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
-  background: transparent;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -630,7 +631,12 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"]::-moz-range-track {
   height: 4px;
   border-radius: 2px;
-  background: transparent;
+  background: var(--slider-unfilled);
+}
+input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: #F7F7F8;
 }
 
 /* Brush panel — spacing + range height (Figma spec) */
@@ -675,7 +681,6 @@ input[type="range"]::-moz-range-track {
 #panel-brush input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
-  background: transparent;
 }
 #panel-brush input[type="range"]::-webkit-slider-thumb {
   width: 13px;
@@ -685,7 +690,6 @@ input[type="range"]::-moz-range-track {
 #panel-brush input[type="range"]::-moz-range-track {
   height: 4px;
   border-radius: 2px;
-  background: transparent;
 }
 #panel-brush input[type="range"]::-moz-range-thumb {
   width: 13px;
