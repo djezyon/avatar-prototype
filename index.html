@@ -987,10 +987,17 @@ input[type="range"]::-moz-range-thumb {
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  background: #fff;
+  --thumb-image: none;
+  background-color: #1f2127;
+  background-image:
+    var(--thumb-image),
+    linear-gradient(45deg, rgba(255,255,255,0.06) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.06) 75%),
+    linear-gradient(45deg, rgba(255,255,255,0.06) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.06) 75%);
+  background-size: contain, 8px 8px, 8px 8px;
+  background-position: center, 0 0, 4px 4px;
+  background-repeat: no-repeat, repeat, repeat;
   flex-shrink: 0;
-  background-size: cover;
-  background-position: center;
+  border: 1px solid rgba(255,255,255,0.24);
 }
 .group-name {
   flex: 1;
@@ -1229,10 +1236,15 @@ input[type="range"]::-moz-range-thumb {
   height: 30px;
   border-radius: 6px;
   border: 1.5px solid rgba(255,255,255,0.24);
+  --thumb-image: none;
   background-color: #1f2127;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-image:
+    var(--thumb-image),
+    linear-gradient(45deg, rgba(255,255,255,0.06) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.06) 75%),
+    linear-gradient(45deg, rgba(255,255,255,0.06) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.06) 75%);
+  background-size: contain, 8px 8px, 8px 8px;
+  background-position: center, 0 0, 4px 4px;
+  background-repeat: no-repeat, repeat, repeat;
   flex-shrink: 0;
 }
 .layer-row.selected .layer-thumb {
@@ -3661,31 +3673,65 @@ function isAccessoryTypeUsed(type) {
   return state.makeup.accessories.some(a => a.type === type);
 }
 
-function makeThumbDataURLFromSurface(surface, size = 32) {
+function makeThumbDataURLFromSurface(surface, size = 32, pad = 2) {
   if (!surface) return '';
+  const sctx = surface.getContext('2d');
+  const data = sctx.getImageData(0, 0, surface.width, surface.height).data;
+  let minX = surface.width;
+  let minY = surface.height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < surface.height; y++) {
+    for (let x = 0; x < surface.width; x++) {
+      const a = data[(y * surface.width + x) * 4 + 3];
+      if (a > 0) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
   const thumb = document.createElement('canvas');
   thumb.width = size;
   thumb.height = size;
   const tctx = thumb.getContext('2d');
   tctx.clearRect(0, 0, size, size);
-  tctx.drawImage(surface, 0, 0, surface.width, surface.height, 0, 0, size, size);
+
+  if (maxX < 0 || maxY < 0) return '';
+
+  const srcW = Math.max(1, maxX - minX + 1);
+  const srcH = Math.max(1, maxY - minY + 1);
+  const fitW = Math.max(1, size - pad * 2);
+  const fitH = Math.max(1, size - pad * 2);
+  const scale = Math.min(fitW / srcW, fitH / srcH);
+  const drawW = srcW * scale;
+  const drawH = srcH * scale;
+  const dx = (size - drawW) * 0.5;
+  const dy = (size - drawH) * 0.5;
+
+  tctx.imageSmoothingEnabled = true;
+  tctx.drawImage(surface, minX, minY, srcW, srcH, dx, dy, drawW, drawH);
   return thumb.toDataURL();
 }
 
 function getLayerThumbStyle(groupId, layerId) {
   const surf = layerSurfaces.get(layerSurfaceKey(groupId, layerId));
   const url = makeThumbDataURLFromSurface(surf);
-  return url ? ` style="background-image:url('${url}');"` : '';
+  return url ? ` style="--thumb-image:url('${url}');"` : '';
 }
 
 function getGroupThumbStyle(group) {
-  const size = 32;
-  const thumb = document.createElement('canvas');
-  thumb.width = size;
-  thumb.height = size;
-  const tctx = thumb.getContext('2d');
-  tctx.clearRect(0, 0, size, size);
-
+  const firstSurf = group.layers
+    .map(l => layerSurfaces.get(layerSurfaceKey(group.id, l.id)))
+    .find(Boolean);
+  if (!firstSurf) return '';
+  const combined = document.createElement('canvas');
+  combined.width = firstSurf.width;
+  combined.height = firstSurf.height;
+  const cctx = combined.getContext('2d');
   let hasAny = false;
   for (let li = group.layers.length - 1; li >= 0; li--) {
     const layer = group.layers[li];
@@ -3693,13 +3739,14 @@ function getGroupThumbStyle(group) {
     const surf = layerSurfaces.get(layerSurfaceKey(group.id, layer.id));
     if (!surf) continue;
     hasAny = true;
-    tctx.save();
-    tctx.globalAlpha = (group.opacity ?? 100) / 100;
-    tctx.drawImage(surf, 0, 0, surf.width, surf.height, 0, 0, size, size);
-    tctx.restore();
+    cctx.save();
+    cctx.globalAlpha = (group.opacity ?? 100) / 100;
+    cctx.drawImage(surf, 0, 0);
+    cctx.restore();
   }
   if (!hasAny) return '';
-  return ` style="background-image:url('${thumb.toDataURL()}');"`;
+  const url = makeThumbDataURLFromSurface(combined, 32, 2);
+  return url ? ` style="--thumb-image:url('${url}');"` : '';
 }
 
 function renderMakeupPanel() {
