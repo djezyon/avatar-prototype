@@ -2861,6 +2861,12 @@ function hideModePicker() {
   modePickerOverlay.setAttribute('aria-hidden', 'true');
 }
 
+function maybeToastRegionalLayerPrompt() {
+  if (state.drawing.mode !== 'regional') return;
+  if (state.makeup.selectedLayerRef) return;
+  showToast('Choose Face, Eyes, or Lips layer');
+}
+
 function selectTool(tool, opts = {}) {
   // Same tool tapped → close
   if (state.activeTool === tool) {
@@ -2974,6 +2980,7 @@ if (modePickerOverlay) {
   }
   modePickerOverlay.addEventListener('click', () => {
     state.drawing.mode = 'regional';
+    maybeToastRegionalLayerPrompt();
     hideModePicker();
     selectTool('brush', { _afterModePicker: true });
   });
@@ -2984,6 +2991,7 @@ if (modePickerOverlay) {
       const selected = modePickerOverlay.querySelector('.mode-card.selected');
       const mode = selected ? selected.dataset.mode : 'regional';
       state.drawing.mode = mode;
+      maybeToastRegionalLayerPrompt();
       localStorage.setItem('brushModeChosen', 'true');
       localStorage.setItem('drawMode', mode);
       hideModePicker();
@@ -3007,6 +3015,7 @@ if (modeToggle) {
       localStorage.setItem('drawMode', mode);
       updateModeTogglePill();
       showToast(mode === 'fullface' ? 'Full Face mode' : 'Regional mode');
+      maybeToastRegionalLayerPrompt();
     });
   });
 }
@@ -3014,6 +3023,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!modePickerOverlay || !modePickerOverlay.classList.contains('visible')) return;
   state.drawing.mode = 'regional';
+  maybeToastRegionalLayerPrompt();
   hideModePicker();
   selectTool('brush', { _afterModePicker: true });
 });
