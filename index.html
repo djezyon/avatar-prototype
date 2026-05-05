@@ -280,8 +280,24 @@ body {
 }
 .sticker-header-actions {
   display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.sticker-add-toolbar {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0 4px 2px 4px;
+}
+.sticker-add-toolbar .btn-blue {
+  flex: 1;
+  min-width: 0;
+}
+.sticker-add-toolbar .sticker-upload-inline {
+  flex-shrink: 0;
 }
 .progress-add.progress-add-ghost {
   background: rgba(255, 255, 255, 0.08);
@@ -574,6 +590,11 @@ body.is-sticker-dragging .draw-canvas { cursor: inherit; }
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .tray-icon-btn:hover { background: var(--selected); color: var(--text-primary); }
+.tray-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .tray-icon-btn svg { width: 16px; height: 16px; }
 
 .tray-body {
@@ -2885,7 +2906,7 @@ const state = {
 
 // Limits and config
 const MAKEUP_MAX_GROUPS = 6;
-const STICKER_MAX = 6;
+const STICKER_MAX = 3;
 const stickerImageCache = new Map(); // id -> HTMLImageElement
 const MAKEUP_GROUP_TYPES = {
   face:  { label: 'Face Group', basePrice: 90 },
@@ -4503,17 +4524,17 @@ function renderStickerPanel() {
 
   let html = '';
   html += `
-    <div class="makeup-items-header">
+    <div class="makeup-items-header sticker-items-header">
       <div class="makeup-items-copy">
         <div class="makeup-items-title">Sticker items</div>
         <div class="makeup-items-subtitle">You can add up to ${STICKER_MAX} stickers on the face only</div>
       </div>
       <div class="sticker-header-actions">
-        <button type="button" class="progress-add progress-add-ghost" id="stickerUploadBtn" aria-label="Upload sticker image">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <button type="button" class="tray-icon-btn" id="stickerHeaderTrash" aria-label="Delete selected sticker" ${!state.stickers.selectedId ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         </button>
-        <button type="button" class="progress-add" id="stickerAddBtn" ${n >= STICKER_MAX ? 'disabled' : ''} aria-label="Add sticker">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <button type="button" class="tray-icon-btn" id="stickerHeaderClearX" aria-label="Remove all stickers" ${n === 0 ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
     </div>
@@ -4521,9 +4542,20 @@ function renderStickerPanel() {
       <div class="progress-track">
         <div class="progress-fill" style="width:${pct}%;"></div>
       </div>
-      <div class="progress-label">${n}/${STICKER_MAX} Stickers on face</div>
+      <div class="progress-label">${n}/${STICKER_MAX} Stickers applied</div>
     </div>
   `;
+
+  if (n < STICKER_MAX) {
+    html += `
+      <div class="sticker-add-toolbar">
+        <button type="button" class="btn-blue" id="stickerAddBtn">Add sticker</button>
+        <button type="button" class="progress-add progress-add-ghost sticker-upload-inline" id="stickerUploadBtn" aria-label="Upload sticker image">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+      </div>
+    `;
+  }
 
   if (n === 0) {
     html += `
@@ -4559,12 +4591,25 @@ function renderStickerPanel() {
   attachStickerPanelHandlers();
 }
 
+function clearAllStickers() {
+  if (!state.stickers.items.length) return;
+  state.stickers.items.forEach((s) => stickerImageCache.delete(s.id));
+  state.stickers.items = [];
+  state.stickers.selectedId = null;
+  clearStickerPointerSession();
+  compositeAllLayersToDisplay();
+  renderStickerPanel();
+  renderStickerManipLayer();
+}
+
 function attachStickerPanelHandlers() {
   if (!stickerPanelEl) return;
   const addDefault = () => addStickerItem(defaultStickerSrc());
   const uploadBtn = document.getElementById('stickerUploadBtn');
   const addBtn = document.getElementById('stickerAddBtn');
   const emptyAdd = document.getElementById('addStickerEmptyBtn');
+  const headerTrash = document.getElementById('stickerHeaderTrash');
+  const headerClearX = document.getElementById('stickerHeaderClearX');
   const fileInput = document.getElementById('stickerFileInput');
   if (uploadBtn) {
     uploadBtn.addEventListener('click', () => {
@@ -4573,6 +4618,23 @@ function attachStickerPanelHandlers() {
   }
   if (addBtn) addBtn.addEventListener('click', () => addDefault());
   if (emptyAdd) emptyAdd.addEventListener('click', () => addDefault());
+  if (headerTrash) {
+    headerTrash.addEventListener('click', () => {
+      const sid = state.stickers.selectedId;
+      if (!sid) {
+        showToast('Select a sticker in the list first');
+        return;
+      }
+      removeStickerItem(sid);
+    });
+  }
+  if (headerClearX) {
+    headerClearX.addEventListener('click', () => {
+      if (!state.stickers.items.length) return;
+      clearAllStickers();
+      showToast('All stickers removed');
+    });
+  }
 
   stickerPanelEl.querySelectorAll('[data-sticker-action="vis"]').forEach((el) => {
     el.addEventListener('click', (e) => {
