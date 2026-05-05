@@ -593,12 +593,13 @@ input[type="range"] {
   width: 100%;
   height: 4px;
   --slider-pct: 0%;
+  --slider-unfilled: #2a2d34;
   background: linear-gradient(
     to right,
     #F7F7F8 0%,
     #F7F7F8 var(--slider-pct),
-    rgba(255,255,255,0.15) var(--slider-pct),
-    rgba(255,255,255,0.15) 100%
+    var(--slider-unfilled) var(--slider-pct),
+    var(--slider-unfilled) 100%
   );
   border-radius: 2px;
   outline: none;
