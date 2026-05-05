@@ -2799,16 +2799,17 @@ function selectTool(tool, opts = {}) {
     return;
   }
 
-  // First-time brush tap → mode picker modal (unless continuing after commit/dismiss)
+  // Entering Brush from non-brush tools: always show the mode picker.
+  // (Switching eraser -> brush stays in the same brush group and skips the modal.)
   if (tool === 'brush' && !opts._afterModePicker) {
-    const chosen = localStorage.getItem('brushModeChosen');
-    if (!chosen) {
-      showModePicker();
-      return;
-    }
     const savedMode = localStorage.getItem('drawMode');
     if (savedMode === 'fullface' || savedMode === 'regional') {
       state.drawing.mode = savedMode;
+    }
+    const cameFromBrushGroup = state.activeTool === 'eraser';
+    if (!cameFromBrushGroup) {
+      showModePicker();
+      return;
     }
   }
 
