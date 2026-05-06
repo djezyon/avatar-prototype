@@ -1917,6 +1917,33 @@ input[type="range"]::-moz-range-progress {
 }
 .menu-popup .menu-item:disabled:hover { background: transparent; }
 .menu-popup .menu-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+.menu-limit-tooltip {
+  display: inline-flex;
+  align-items: center;
+  position: absolute;
+  right: 8px;
+  top: -42px;
+  background: #fff;
+  color: #202327;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  white-space: nowrap;
+}
+.menu-limit-tooltip::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  top: 100%;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 8px solid #fff;
+}
 
 .menu-popup-backdrop {
   position: fixed;
@@ -5284,7 +5311,7 @@ function renderMakeupPanel() {
   html += `
     <div class="makeup-items-header">
       <div class="makeup-items-title">Makeup items</div>
-      <button class="progress-add" id="progressAddBtn" ${groupCount >= MAKEUP_MAX_GROUPS ? 'disabled' : ''} aria-label="Add makeup item">
+      <button class="progress-add" id="progressAddBtn" aria-label="Add makeup item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
     </div>
@@ -5472,10 +5499,6 @@ function attachMakeupHandlers() {
   // Top progress + button
   const progAdd = document.getElementById('progressAddBtn');
   if (progAdd) progAdd.addEventListener('click', (e) => {
-    if (getGroupCount() >= MAKEUP_MAX_GROUPS) {
-      showToast(`Max ${MAKEUP_MAX_GROUPS} makeup items`);
-      return;
-    }
     openMenuPopup(progAdd, 'all');
   });
 
@@ -5544,10 +5567,6 @@ function attachMakeupHandlers() {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         // Per spec: opens the menuStudio popup again
-        if (getGroupCount() >= MAKEUP_MAX_GROUPS) {
-          showToast(`Max ${MAKEUP_MAX_GROUPS} makeup items`);
-          return;
-        }
         openMenuPopup(el, 'all');
       });
     }
@@ -5837,6 +5856,9 @@ function openMenuPopup(anchorEl, mode) {
   let html = '';
   let firstFocusableAssigned = false;
   if (showMakeup) {
+    if (groupAtCap) {
+      html += `<div class="menu-limit-tooltip">Layer limit reached — remove one to add more</div>`;
+    }
     html += `<div class="menu-section-label">Add Makeup Item</div>`;
     ['face','eye','lips'].forEach((t, i) => {
       // First non-disabled item gets focus
@@ -5936,7 +5958,6 @@ function onMenuPick(type, cat) {
   closeMenuPopup();
   if (cat === 'group') {
     if (getGroupCount() >= MAKEUP_MAX_GROUPS) {
-      showToast(`Max ${MAKEUP_MAX_GROUPS} makeup items`);
       return;
     }
     addMakeupGroup(type);
