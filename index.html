@@ -329,6 +329,46 @@ body {
   pointer-events: none;
   user-select: none;
 }
+.pattern-controls {
+  margin-top: 6px;
+  padding: 0 4px;
+}
+.pattern-section-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 16px 0 8px;
+}
+.pattern-zone-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--r-pill);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 4px;
+}
+.pattern-zone-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.pattern-zone-btn svg { width: 18px; height: 18px; }
+.pattern-zone-btn.active {
+  background: rgba(255,255,255,0.14);
+  color: var(--text-primary);
+}
+.pattern-padding-wrap { margin-top: 16px; }
+.pattern-padding-wrap .pattern-section-label { margin: 0 0 8px; }
+.pattern-padding-wrap input[type="range"] { width: 100%; }
 .progress-add.progress-add-ghost {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -2695,10 +2735,7 @@ input[type="range"]::-moz-range-progress {
           <div class="makeup-panel sticker-panel" id="stickerPanelContent"></div>
         </div>
         <div class="panel" id="panel-pattern">
-          <div class="placeholder-content">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-            <div>Pattern library<br>Coming next</div>
-          </div>
+          <div class="makeup-panel pattern-panel" id="patternPanelContent"></div>
         </div>
         <div class="panel" id="panel-lashes">
           <div class="placeholder-content">
@@ -2922,6 +2959,10 @@ const state = {
     selectedId: null,
     nextNum: 1,
   },
+  pattern: {
+    zone: 'face',
+    padding: 20,
+  },
 };
 
 // Limits and config
@@ -3123,28 +3164,102 @@ function syncAllLayerSurfaceSizes() {
   compositeAllLayersToDisplay();
 }
 
-function drawStickersClippedToFace(ctx, rect) {
+function clipCtxForStickerZone(sctx, rect, zone) {
   const fg = getFaceGeometry(rect);
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(fg.headCx, fg.headCy, fg.headRx, fg.headRy, 0, 0, Math.PI * 2);
-  ctx.clip();
+  sctx.beginPath();
+  if (zone === 'eye') {
+    sctx.ellipse(fg.leftEyeCx, fg.eyeCy, fg.eyeRx, fg.eyeRy, 0, 0, Math.PI * 2);
+    sctx.ellipse(fg.rightEyeCx, fg.eyeCy, fg.eyeRx, fg.eyeRy, 0, 0, Math.PI * 2);
+  } else if (zone === 'lips') {
+    sctx.ellipse(fg.headCx, fg.lipsCy, fg.lipsRx, fg.lipsRy, 0, 0, Math.PI * 2);
+  } else {
+    sctx.ellipse(fg.headCx, fg.headCy, fg.headRx, fg.headRy, 0, 0, Math.PI * 2);
+  }
+  sctx.clip();
+}
 
+function getStickerZoneBounds(rect, zone) {
+  const g = getFaceGeometry(rect);
+  if (zone === 'eye') {
+    return {
+      minX: g.leftEyeCx - g.eyeRx,
+      maxX: g.rightEyeCx + g.eyeRx,
+      minY: g.eyeCy - g.eyeRy,
+      maxY: g.eyeCy + g.eyeRy,
+    };
+  }
+  if (zone === 'lips') {
+    return {
+      minX: g.headCx - g.lipsRx,
+      maxX: g.headCx + g.lipsRx,
+      minY: g.lipsCy - g.lipsRy,
+      maxY: g.lipsCy + g.lipsRy,
+    };
+  }
+  return {
+    minX: g.headCx - g.headRx,
+    maxX: g.headCx + g.headRx,
+    minY: g.headCy - g.headRy,
+    maxY: g.headCy + g.headRy,
+  };
+}
+
+function drawStickerSingle(ctx, s, img) {
+  const bw = s.baseW || img.naturalWidth;
+  const bh = s.baseH || img.naturalHeight;
+  const w = bw * s.scale;
+  const h = bh * s.scale;
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  ctx.rotate(s.rotation);
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
+function drawStickerRepeat(ctx, rect, s, img) {
+  const zone = s.repeatZone || 'face';
+  const pad = Math.max(0, Number(s.repeatPadding ?? state.pattern.padding) || 0);
+  const bw = s.baseW || img.naturalWidth;
+  const bh = s.baseH || img.naturalHeight;
+  const w = bw * s.scale;
+  const h = bh * s.scale;
+  const stepX = Math.max(6, w + pad);
+  const stepY = Math.max(6, h + pad);
+  const bounds = getStickerZoneBounds(rect, zone);
+
+  let startX = s.x;
+  let startY = s.y;
+  while (startX > bounds.minX - stepX) startX -= stepX;
+  while (startY > bounds.minY - stepY) startY -= stepY;
+
+  ctx.save();
+  clipCtxForStickerZone(ctx, rect, zone);
+  for (let y = startY; y <= bounds.maxY + stepY; y += stepY) {
+    for (let x = startX; x <= bounds.maxX + stepX; x += stepX) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(s.rotation);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+function drawStickersClippedToFace(ctx, rect) {
   for (const s of state.stickers.items) {
     if (!s.visible) continue;
     const img = stickerImageCache.get(s.id);
     if (!img || !img.complete || !img.naturalWidth) continue;
-    const bw = s.baseW || img.naturalWidth;
-    const bh = s.baseH || img.naturalHeight;
-    const w = bw * s.scale;
-    const h = bh * s.scale;
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    ctx.rotate(s.rotation);
-    ctx.drawImage(img, -w / 2, -h / 2, w, h);
-    ctx.restore();
+    if (s.repeat) {
+      drawStickerRepeat(ctx, rect, s, img);
+    } else {
+      ctx.save();
+      clipCtxForStickerZone(ctx, rect, 'face');
+      drawStickerSingle(ctx, s, img);
+      ctx.restore();
+    }
   }
-  ctx.restore();
 }
 
 function compositeAllLayersToDisplay() {
@@ -3782,7 +3897,7 @@ const toolTitles = {
   eraser: 'Eraser',
   makeup: 'Makeup',
   sticker: 'Stickers',
-  pattern: 'Patterns',
+  pattern: 'Pattern',
   lashes: 'Eyelash & Eyebrow',
   kitbash: 'Kitbash',
 };
@@ -3926,6 +4041,7 @@ function selectTool(tool, opts = {}) {
   trayTitle.textContent = toolTitles[tool];
 
   if (tool === 'sticker' && typeof renderStickerPanel === 'function') renderStickerPanel();
+  if (tool === 'pattern' && typeof renderPatternPanel === 'function') renderPatternPanel();
   if (typeof renderStickerManipLayer === 'function') renderStickerManipLayer();
 
   updateModeTogglePill();
@@ -4490,10 +4606,11 @@ function removeStickerItem(id) {
   if (state.stickers.selectedId === id) state.stickers.selectedId = null;
   compositeAllLayersToDisplay();
   renderStickerPanel();
+  renderPatternPanel();
   renderStickerManipLayer();
 }
 
-function addStickerItem(src) {
+function addStickerItem(src, opts = {}) {
   if (state.stickers.items.length >= STICKER_MAX) return;
   const id = newStickerId();
   const n = state.stickers.nextNum++;
@@ -4510,6 +4627,9 @@ function addStickerItem(src) {
     scale: 0.35,
     baseW: 96,
     baseH: 96,
+    repeat: !!opts.repeat,
+    repeatZone: opts.repeatZone || state.pattern.zone,
+    repeatPadding: Number(opts.repeatPadding ?? state.pattern.padding) || 0,
   };
   state.stickers.items.push(s);
   state.stickers.selectedId = id;
@@ -4529,6 +4649,7 @@ function addStickerItem(src) {
     stickerImageCache.set(id, img);
     compositeAllLayersToDisplay();
     renderStickerPanel();
+    renderPatternPanel();
     renderStickerManipLayer();
   };
   img.onload = applyLoadedSize;
@@ -4541,6 +4662,7 @@ function addStickerItem(src) {
   if (img.complete && img.naturalWidth) applyLoadedSize();
 
   renderStickerPanel();
+  renderPatternPanel();
   renderStickerManipLayer();
   compositeAllLayersToDisplay();
 }
@@ -4548,7 +4670,7 @@ function addStickerItem(src) {
 function updateStickerTrayChrome() {
   const btn = document.getElementById('stickerTrayTrash');
   if (!btn) return;
-  const on = state.activeTool === 'sticker';
+  const on = (state.activeTool === 'sticker' || state.activeTool === 'pattern');
   btn.hidden = !on;
   btn.disabled = on && !state.stickers.selectedId;
 }
@@ -4590,6 +4712,94 @@ function attachStickerPanelHandlers() {
       if (!src) return;
       if (state.stickers.items.length >= STICKER_MAX) return;
       addStickerItem(src);
+    });
+  });
+}
+
+const patternPanelEl = document.getElementById('patternPanelContent');
+
+function renderPatternPanel() {
+  if (!patternPanelEl) return;
+  const n = state.stickers.items.length;
+  const pct = (n / STICKER_MAX) * 100;
+  const zone = state.pattern.zone;
+  const zoneBtn = (z, label, icon) =>
+    `<button type="button" class="pattern-zone-btn ${zone === z ? 'active' : ''}" data-pattern-zone="${z}" aria-label="${label}">${icon}</button>`;
+
+  let html = `
+    <div class="progress-row">
+      <div class="progress-track">
+        <div class="progress-fill" style="width:${pct}%;"></div>
+      </div>
+      <div class="progress-label">${n}/${STICKER_MAX} Stickers Applied</div>
+    </div>
+    <div class="pattern-controls">
+      <div class="pattern-section-label">Body Section</div>
+      <div class="pattern-zone-row">
+        ${zoneBtn('face', 'Face', MENU_ICONS.face)}
+        ${zoneBtn('eye', 'Eyes', MENU_ICONS.eye)}
+        ${zoneBtn('lips', 'Lips', MENU_ICONS.lips)}
+      </div>
+      <div class="pattern-padding-wrap">
+        <div class="pattern-section-label">Padding</div>
+        <input type="range" id="patternPaddingSlider" min="0" max="120" value="${state.pattern.padding}">
+      </div>
+      <div class="pattern-section-label">Pattern</div>
+    </div>
+    <div class="sticker-lib-grid">
+  `;
+  STICKER_LIBRARY_SRC.forEach((src, i) => {
+    html += `<button type="button" class="sticker-lib-tile" data-pattern-lib="${src}" aria-label="${i + 1}">
+      <img src="${escapeHtml(src)}" alt="" loading="lazy">
+    </button>`;
+  });
+  html += '</div>';
+
+  patternPanelEl.innerHTML = html;
+  patternPanelEl.querySelectorAll('input[type="range"]').forEach(updateRangeFill);
+  attachPatternPanelHandlers();
+  updateStickerTrayChrome();
+}
+
+function attachPatternPanelHandlers() {
+  if (!patternPanelEl) return;
+  patternPanelEl.querySelectorAll('[data-pattern-zone]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const zone = btn.getAttribute('data-pattern-zone');
+      if (!zone) return;
+      state.pattern.zone = zone;
+      const s = getStickerById(state.stickers.selectedId);
+      if (s) {
+        s.repeat = true;
+        s.repeatZone = zone;
+      }
+      renderPatternPanel();
+      compositeAllLayersToDisplay();
+    });
+  });
+  const pad = document.getElementById('patternPaddingSlider');
+  if (pad) {
+    pad.addEventListener('input', () => {
+      const val = parseInt(pad.value, 10) || 0;
+      state.pattern.padding = val;
+      const s = getStickerById(state.stickers.selectedId);
+      if (s) {
+        s.repeat = true;
+        s.repeatPadding = val;
+      }
+      compositeAllLayersToDisplay();
+    });
+  }
+  patternPanelEl.querySelectorAll('.sticker-lib-tile').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (state.stickers.items.length >= STICKER_MAX) return;
+      const src = btn.getAttribute('data-pattern-lib');
+      if (!src) return;
+      addStickerItem(src, {
+        repeat: true,
+        repeatZone: state.pattern.zone,
+        repeatPadding: state.pattern.padding,
+      });
     });
   });
 }
@@ -4669,13 +4879,14 @@ function startStickerDrag(mode, s, e) {
 }
 
 function stickerManipPointerDown(e) {
-  if (state.activeTool !== 'sticker') return;
+  if (state.activeTool !== 'sticker' && state.activeTool !== 'pattern') return;
   const layer = document.getElementById('stickerManipLayer');
   if (!layer || !layer.classList.contains('interactive')) return;
 
   if (e.target === layer) {
     state.stickers.selectedId = null;
     renderStickerPanel();
+    renderPatternPanel();
     renderStickerManipLayer();
     return;
   }
@@ -4703,6 +4914,7 @@ function stickerManipPointerDown(e) {
     e.stopPropagation();
     state.stickers.selectedId = id;
     renderStickerPanel();
+    renderPatternPanel();
     startStickerDrag('move', s, e);
   }
 }
@@ -4710,7 +4922,7 @@ function stickerManipPointerDown(e) {
 function renderStickerManipLayer() {
   const layer = document.getElementById('stickerManipLayer');
   if (!layer) return;
-  const show = state.activeTool === 'sticker' && state.stickers.selectedId;
+  const show = (state.activeTool === 'sticker' || state.activeTool === 'pattern') && state.stickers.selectedId;
   layer.classList.toggle('interactive', !!show);
   layer.setAttribute('aria-hidden', show ? 'false' : 'true');
   if (!show) {
