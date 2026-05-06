@@ -334,23 +334,24 @@ body {
   padding: 0 4px;
 }
 .pattern-section-label {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 16px 0 8px;
+  margin: 16px 0 10px;
 }
 .pattern-zone-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   border-radius: var(--r-pill);
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.08);
-  padding: 4px;
+  padding: 6px;
+  min-height: 48px;
 }
 .pattern-zone-btn {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border: none;
   border-radius: 999px;
   background: transparent;
@@ -361,14 +362,48 @@ body {
   justify-content: center;
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
-.pattern-zone-btn svg { width: 18px; height: 18px; }
+.pattern-zone-btn .pattern-zone-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  opacity: 0.86;
+  filter: grayscale(1) brightness(1.6);
+}
 .pattern-zone-btn.active {
   background: rgba(255,255,255,0.14);
   color: var(--text-primary);
 }
+.pattern-zone-btn.active .pattern-zone-icon {
+  opacity: 1;
+  filter: none;
+}
 .pattern-padding-wrap { margin-top: 16px; }
 .pattern-padding-wrap .pattern-section-label { margin: 0 0 8px; }
-.pattern-padding-wrap input[type="range"] { width: 100%; }
+.pattern-padding-wrap input[type="range"] {
+  width: 100%;
+  height: 13.5px;
+}
+.pattern-padding-wrap input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+}
+.pattern-padding-wrap input[type="range"]::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+}
+.pattern-padding-wrap input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+}
+.pattern-padding-wrap input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: white;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
 .progress-add.progress-add-ghost {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -4723,8 +4758,15 @@ function renderPatternPanel() {
   const n = state.stickers.items.length;
   const pct = (n / STICKER_MAX) * 100;
   const zone = state.pattern.zone;
-  const zoneBtn = (z, label, icon) =>
-    `<button type="button" class="pattern-zone-btn ${zone === z ? 'active' : ''}" data-pattern-zone="${z}" aria-label="${label}">${icon}</button>`;
+  const zoneIconMap = {
+    face: './assets/icons/Icon_head.png',
+    eye: './assets/icons/Icon_eyes.png',
+    lips: './assets/icons/Icon_lips.png',
+  };
+  const zoneBtn = (z, label) =>
+    `<button type="button" class="pattern-zone-btn ${zone === z ? 'active' : ''}" data-pattern-zone="${z}" aria-label="${label}">
+      <img class="pattern-zone-icon" src="${zoneIconMap[z]}" alt="">
+    </button>`;
 
   let html = `
     <div class="progress-row">
@@ -4736,9 +4778,9 @@ function renderPatternPanel() {
     <div class="pattern-controls">
       <div class="pattern-section-label">Body Section</div>
       <div class="pattern-zone-row">
-        ${zoneBtn('face', 'Face', MENU_ICONS.face)}
-        ${zoneBtn('eye', 'Eyes', MENU_ICONS.eye)}
-        ${zoneBtn('lips', 'Lips', MENU_ICONS.lips)}
+        ${zoneBtn('face', 'Face')}
+        ${zoneBtn('eye', 'Eyes')}
+        ${zoneBtn('lips', 'Lips')}
       </div>
       <div class="pattern-padding-wrap">
         <div class="pattern-section-label">Padding</div>
