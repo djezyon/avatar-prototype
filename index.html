@@ -672,6 +672,9 @@ body.is-sticker-dragging .draw-canvas { cursor: inherit; }
 .tray.mode-in-header .tray-mode-toggle {
   display: inline-flex;
 }
+.tray-mode-toggle {
+  display: none !important;
+}
 .tray-mode-toggle .mode-segment {
   padding: 8px 14px;
   font-size: 12px;
@@ -3964,7 +3967,7 @@ const panels = {
 const toolTitles = {
   brush: 'Brush',
   eraser: 'Eraser',
-  makeup: 'Makeup',
+  makeup: 'Creation Layers',
   sticker: 'Stickers',
   pattern: 'Pattern',
   lashes: 'Eyelash & Eyebrow',
@@ -3990,7 +3993,7 @@ function updateModeTogglePill() {
       seg.classList.toggle('active', seg.dataset.mode === state.drawing.mode);
     });
   }
-  const showHeaderMode = state.activeTool === 'makeup';
+  const showHeaderMode = false;
   tray.classList.toggle('mode-in-header', showHeaderMode);
   if (trayModeToggle) {
     trayModeToggle.setAttribute('aria-hidden', showHeaderMode ? 'false' : 'true');
@@ -5134,24 +5137,10 @@ function renderMakeupPanel() {
 
   html += `
     <div class="makeup-items-header">
-      <div class="makeup-items-copy">
-        <div class="makeup-items-title">Makeup items</div>
-        <div class="makeup-items-subtitle">You can create up to ${MAKEUP_MAX_GROUPS} makeup items</div>
-      </div>
+      <div class="makeup-items-title">Makeup items</div>
       <button class="progress-add" id="progressAddBtn" ${groupCount >= MAKEUP_MAX_GROUPS ? 'disabled' : ''} aria-label="Add makeup item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
-    </div>
-  `;
-
-  // Progress row — thin pill bar + "X/6 Layers Applied" label
-  const pct = (groupCount / MAKEUP_MAX_GROUPS) * 100;
-  html += `
-    <div class="progress-row">
-      <div class="progress-track">
-        <div class="progress-fill" style="width:${pct}%;"></div>
-      </div>
-      <div class="progress-label">${groupCount}/${MAKEUP_MAX_GROUPS} Layers Applied</div>
     </div>
   `;
 
