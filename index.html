@@ -333,6 +333,9 @@ body {
   margin-top: 6px;
   padding: 0 4px;
 }
+.pattern-panel .progress-row {
+  margin-bottom: 16px;
+}
 .pattern-section-label {
   font-size: 14px;
   font-weight: 600;
@@ -379,7 +382,7 @@ body {
   opacity: 1;
   filter: none;
 }
-.pattern-padding-wrap { margin-top: 16px; }
+.pattern-padding-wrap { margin-top: 16px; margin-bottom: 16px; }
 .pattern-padding-wrap .pattern-section-label { margin: 0 0 8px; }
 .pattern-padding-wrap input[type="range"] {
   width: 100%;
@@ -405,6 +408,9 @@ body {
   background: white;
   border: none;
   box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.sticker-panel .progress-row {
+  margin-bottom: 16px;
 }
 .progress-add.progress-add-ghost {
   background: rgba(255, 255, 255, 0.08);
@@ -4791,7 +4797,6 @@ function renderPatternPanel() {
         <div class="pattern-section-label">Padding</div>
         <input type="range" id="patternPaddingSlider" min="0" max="120" value="${state.pattern.padding}">
       </div>
-      <div class="pattern-section-label">Pattern</div>
     </div>
     <div class="sticker-lib-grid">
   `;
