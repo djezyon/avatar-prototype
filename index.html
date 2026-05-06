@@ -5530,7 +5530,7 @@ function attachMakeupHandlers() {
         e.stopPropagation();
         const g = state.makeup.groups.find(x => x.id === groupId);
         const amount = g ? MAKEUP_GROUP_TYPES[g.type].basePrice : 90;
-        showToast(`${amount} robux will be charged when check out`);
+        showToast('Robux will be charged when checkout');
       });
     }
     if (action === 'group-menu') {
