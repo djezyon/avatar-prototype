@@ -1962,6 +1962,48 @@ input[type="range"]::-moz-range-progress {
 .mode-picker-backdrop.visible .mode-picker-dialog {
   transform: scale(1);
 }
+.paint-layer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(5, 6, 10, 0.6);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out), visibility var(--dur-fast) var(--ease-out);
+}
+.paint-layer-backdrop.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.paint-layer-dialog {
+  width: 100%;
+  max-width: 500px;
+  background: var(--surface-card);
+  border-radius: 18px;
+  border: 1px solid rgba(208, 217, 251, 0.1);
+  padding: 22px 22px 20px;
+  box-shadow:
+    0 2px 4px rgba(4, 4, 8, 0.25),
+    0 10px 24px rgba(4, 4, 8, 0.35),
+    0 24px 48px rgba(4, 4, 8, 0.45);
+}
+.paint-layer-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+.paint-layer-btn {
+  width: 100%;
+  margin-top: 18px;
+}
 .mode-picker-title {
   font-size: 17px;
   font-weight: 700;
@@ -2913,6 +2955,13 @@ input[type="range"]::-moz-range-progress {
       </div>
     </div>
 
+    <div class="paint-layer-backdrop" id="paintLayerOverlay" aria-hidden="true">
+      <div class="paint-layer-dialog" role="dialog" aria-modal="true" aria-labelledby="paintLayerTitle">
+        <h2 class="paint-layer-title" id="paintLayerTitle">You must create layers to paint</h2>
+        <button type="button" class="btn-blue paint-layer-btn" id="paintLayerCreateBtn">Create Face layer</button>
+      </div>
+    </div>
+
     <!-- AVATAR PREVIEW SCREEN -->
     <div class="preview-screen" id="previewScreen">
       <!-- Background image (optional — only shows if file exists; falls back to gradient) -->
@@ -3023,6 +3072,7 @@ const state = {
   stickerSelected: false,
   drawing: {
     mode: 'regional', // 'regional' | 'fullface'
+    fullFaceInitialized: false,
   },
   // Brush settings
   brushSize: 12,
@@ -3583,6 +3633,10 @@ function startStroke(e) {
   } else {
     if (!state.makeup.selectedLayerRef) {
       const inferred = inferRegionTypeAtPoint(p.x, p.y);
+      if (state.makeup.groups.length === 0) {
+        showPaintLayerDialog(inferred);
+        return;
+      }
       ensureGroupForPaint(inferred);
     }
     if (!canPaintAt(p.x, p.y)) return;
@@ -4001,6 +4055,9 @@ const bottomToolbar = document.getElementById('bottomToolbar');
 const modeToggle = document.getElementById('modeToggle');
 const modePickerOverlay = document.getElementById('modePickerOverlay');
 const modePickerDialog = modePickerOverlay && modePickerOverlay.querySelector('.mode-picker-dialog');
+const paintLayerOverlay = document.getElementById('paintLayerOverlay');
+const paintLayerCreateBtn = document.getElementById('paintLayerCreateBtn');
+let pendingPaintRegionType = null;
 
 function updateModeTogglePill() {
   const showPill = !!modeToggle && (
@@ -4038,6 +4095,40 @@ function hideModePicker() {
   if (!modePickerOverlay) return;
   modePickerOverlay.classList.remove('visible');
   modePickerOverlay.setAttribute('aria-hidden', 'true');
+}
+
+function showPaintLayerDialog(regionType) {
+  if (!paintLayerOverlay || !paintLayerCreateBtn) return;
+  pendingPaintRegionType = regionType || 'face';
+  const label = pendingPaintRegionType === 'eye' ? 'Eyes' : pendingPaintRegionType === 'lips' ? 'Lips' : 'Face';
+  paintLayerCreateBtn.textContent = `Create ${label} layer`;
+  paintLayerOverlay.classList.add('visible');
+  paintLayerOverlay.setAttribute('aria-hidden', 'false');
+}
+
+function hidePaintLayerDialog() {
+  if (!paintLayerOverlay) return;
+  paintLayerOverlay.classList.remove('visible');
+  paintLayerOverlay.setAttribute('aria-hidden', 'true');
+}
+
+function confirmFullFaceSelection() {
+  if (!state.drawing.fullFaceInitialized) {
+    const ensured = ensureFullFaceGroups();
+    if (ensured.createdAny) {
+      showToast('Full Face created Face, Eyes, and Lips Layer 1');
+    }
+    state.drawing.fullFaceInitialized = true;
+  }
+  if (!canEnableFullFaceMode()) {
+    showToast('You must have one Eye, Lips and Face group each');
+    return false;
+  }
+  state.drawing.mode = 'fullface';
+  localStorage.setItem('drawMode', 'fullface');
+  updateModeTogglePill();
+  showToast('Full Face mode');
+  return true;
 }
 
 function maybeToastRegionalLayerPrompt() {
@@ -4197,19 +4288,13 @@ if (modePickerOverlay) {
       const selected = modePickerOverlay.querySelector('.mode-card.selected');
       const mode = selected ? selected.dataset.mode : 'regional';
       if (mode === 'fullface') {
-        const ensured = ensureFullFaceGroups();
-        if (ensured.createdAny) {
-          showToast('Full Face created Face, Eyes, and Lips Layer 1');
-        }
+        if (!confirmFullFaceSelection()) return;
+      } else {
+        state.drawing.mode = 'regional';
+        localStorage.setItem('drawMode', 'regional');
       }
-      if (mode === 'fullface' && !canEnableFullFaceMode()) {
-        showToast('You must have one Eye, Lips and Face group each');
-        return;
-      }
-      state.drawing.mode = mode;
       maybeToastRegionalLayerPrompt();
       localStorage.setItem('brushModeChosen', 'true');
-      localStorage.setItem('drawMode', mode);
       hideModePicker();
       selectTool('brush', { _afterModePicker: true });
     });
@@ -4222,25 +4307,37 @@ if (modePickerOverlay) {
     });
   });
 }
+if (paintLayerOverlay) {
+  paintLayerOverlay.addEventListener('click', () => {
+    hidePaintLayerDialog();
+    pendingPaintRegionType = null;
+  });
+  const paintDialog = paintLayerOverlay.querySelector('.paint-layer-dialog');
+  if (paintDialog) paintDialog.addEventListener('click', (e) => e.stopPropagation());
+}
+if (paintLayerCreateBtn) {
+  paintLayerCreateBtn.addEventListener('click', () => {
+    const type = pendingPaintRegionType || 'face';
+    ensureGroupForPaint(type);
+    hidePaintLayerDialog();
+    pendingPaintRegionType = null;
+    showToast(`Created ${type === 'eye' ? 'Eyes' : type === 'lips' ? 'Lips' : 'Face'} layer`);
+    if (state.activeTool === 'makeup') renderMakeupPanel();
+  });
+}
 if (modeToggle) {
   modeToggle.querySelectorAll('.mode-segment').forEach(seg => {
     seg.addEventListener('click', () => {
       const mode = seg.dataset.mode;
       if (!mode || mode === state.drawing.mode) return;
       if (mode === 'fullface') {
-        const ensured = ensureFullFaceGroups();
-        if (ensured.createdAny) {
-          showToast('Full Face created Face, Eyes, and Lips Layer 1');
-        }
+        if (!confirmFullFaceSelection()) return;
+      } else {
+        state.drawing.mode = 'regional';
+        localStorage.setItem('drawMode', 'regional');
+        updateModeTogglePill();
+        showToast('Regional mode');
       }
-      if (mode === 'fullface' && !canEnableFullFaceMode()) {
-        showToast('You must have one Eye, Lips and Face group each');
-        return;
-      }
-      state.drawing.mode = mode;
-      localStorage.setItem('drawMode', mode);
-      updateModeTogglePill();
-      showToast(mode === 'fullface' ? 'Full Face mode' : 'Regional mode');
       maybeToastRegionalLayerPrompt();
     });
   });
@@ -4251,19 +4348,13 @@ if (trayModeToggle) {
       const mode = seg.dataset.mode;
       if (!mode || mode === state.drawing.mode) return;
       if (mode === 'fullface') {
-        const ensured = ensureFullFaceGroups();
-        if (ensured.createdAny) {
-          showToast('Full Face created Face, Eyes, and Lips Layer 1');
-        }
+        if (!confirmFullFaceSelection()) return;
+      } else {
+        state.drawing.mode = 'regional';
+        localStorage.setItem('drawMode', 'regional');
+        updateModeTogglePill();
+        showToast('Regional mode');
       }
-      if (mode === 'fullface' && !canEnableFullFaceMode()) {
-        showToast('You must have one Eye, Lips and Face group each');
-        return;
-      }
-      state.drawing.mode = mode;
-      localStorage.setItem('drawMode', mode);
-      updateModeTogglePill();
-      showToast(mode === 'fullface' ? 'Full Face mode' : 'Regional mode');
       maybeToastRegionalLayerPrompt();
       if (state.activeTool === 'makeup') renderMakeupPanel();
     });
@@ -4271,6 +4362,11 @@ if (trayModeToggle) {
 }
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (paintLayerOverlay && paintLayerOverlay.classList.contains('visible')) {
+    hidePaintLayerDialog();
+    pendingPaintRegionType = null;
+    return;
+  }
   if (!modePickerOverlay || !modePickerOverlay.classList.contains('visible')) return;
   state.drawing.mode = 'regional';
   maybeToastRegionalLayerPrompt();
