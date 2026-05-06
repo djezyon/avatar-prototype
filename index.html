@@ -1431,6 +1431,27 @@ input[type="range"]::-moz-range-progress {
   font-size: 14px;
   line-height: 1;
 }
+#panel-makeup .makeup-items-header {
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 0 4px;
+}
+#panel-makeup .progress-add {
+  margin-left: auto;
+}
+#panel-makeup .makeup-panel > * + * {
+  margin-top: 8px;
+}
+#panel-makeup .section-heading {
+  padding: 0 4px;
+  margin-top: 0;
+}
+.makeup-section-divider {
+  height: 1px;
+  margin: 8px 4px;
+  background: var(--divider);
+}
 
 /* Group card */
 .group-card {
@@ -5165,6 +5186,8 @@ function renderMakeupPanel() {
     // Drop zone AFTER the last group
     html += `<div class="group-drop-zone" data-group-drop-index="${groups.length}"></div>`;
   }
+
+  html += `<div class="makeup-section-divider"></div>`;
 
   // Face Accessories section
   html += `<div class="section-heading">Face Accessories</div>`;
