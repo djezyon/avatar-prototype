@@ -1946,6 +1946,7 @@ input[type="range"]::-moz-range-progress {
   pointer-events: auto;
 }
 .mode-picker-dialog {
+  position: relative;
   width: 100%;
   max-width: 480px;
   background: var(--surface-card);
@@ -2050,6 +2051,33 @@ input[type="range"]::-moz-range-progress {
   display: block;
   width: 100%;
   height: 100%;
+}
+.mode-card-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mode-picker-tooltip {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 176px;
+  white-space: nowrap;
+  background: #fff;
+  color: #222;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.2;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.mode-picker-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 .mode-card-check {
   position: absolute;
@@ -2901,12 +2929,7 @@ input[type="range"]::-moz-range-progress {
         <div class="mode-picker-grid">
           <button type="button" class="mode-card selected" data-mode="regional">
             <div class="mode-card-art">
-              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <ellipse cx="50" cy="52" rx="28" ry="34" stroke="rgba(255,255,255,0.25)" stroke-width="1.2"/>
-                <ellipse cx="38" cy="44" rx="10" ry="7" stroke="#fff" stroke-width="1" stroke-dasharray="3 2" fill="rgba(180,120,220,0.35)"/>
-                <ellipse cx="62" cy="44" rx="10" ry="7" stroke="#fff" stroke-width="1" stroke-dasharray="3 2" fill="rgba(180,120,220,0.35)"/>
-                <path d="M38 68 Q50 62 62 68 Q50 78 38 68" stroke="#fff" stroke-width="1" stroke-dasharray="3 2" fill="rgba(220,100,160,0.4)"/>
-              </svg>
+              <img src="./assets/images/Mode-popup-Regional%20image.png" alt="" aria-hidden="true">
             </div>
             <span class="mode-card-check" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
@@ -2918,29 +2941,7 @@ input[type="range"]::-moz-range-progress {
           </button>
           <button type="button" class="mode-card" data-mode="fullface">
             <div class="mode-card-art">
-              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <defs>
-                  <clipPath id="modeFaceClip"><ellipse cx="50" cy="52" rx="28" ry="34"/></clipPath>
-                  <linearGradient id="modeFlagGrad" x1="22" y1="36" x2="78" y2="78" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stop-color="#b22234"/>
-                    <stop offset="18%" stop-color="#b22234"/>
-                    <stop offset="18%" stop-color="#fff"/>
-                    <stop offset="36%" stop-color="#fff"/>
-                    <stop offset="36%" stop-color="#b22234"/>
-                    <stop offset="54%" stop-color="#b22234"/>
-                    <stop offset="54%" stop-color="#fff"/>
-                    <stop offset="72%" stop-color="#fff"/>
-                    <stop offset="72%" stop-color="#b22234"/>
-                    <stop offset="100%" stop-color="#3c3b6e"/>
-                  </linearGradient>
-                </defs>
-                <g clip-path="url(#modeFaceClip)">
-                  <ellipse cx="50" cy="52" rx="28" ry="34" fill="url(#modeFlagGrad)"/>
-                  <rect x="22" y="36" width="18" height="16" fill="#3c3b6e"/>
-                  <path fill="#fff" d="M26 40l1 2h2l-1.6 1.2.6 2-1.6-1.2L25 45.2l.6-2L24 42h2zm5 0l1 2h2l-1.6 1.2.6 2-1.6-1.2L30 45.2l.6-2L29 42h2zm5 0l1 2h2l-1.6 1.2.6 2-1.6-1.2L35 45.2l.6-2L34 42h2zm-5 5l1 2h2l-1.6 1.2.6 2-1.6-1.2L30 50.2l.6-2L29 47h2zm5 0l1 2h2l-1.6 1.2.6 2-1.6-1.2L35 50.2l.6-2L34 47h2z"/>
-                </g>
-                <ellipse cx="50" cy="52" rx="28" ry="34" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1"/>
-              </svg>
+              <img src="./assets/images/Mode-popup-Full%20face%20image.png" alt="" aria-hidden="true">
             </div>
             <span class="mode-card-check" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
@@ -2951,6 +2952,7 @@ input[type="range"]::-moz-range-progress {
             </div>
           </button>
         </div>
+        <div class="mode-picker-tooltip" id="modeFullfaceTooltip" aria-hidden="true">Face, eyes and lips layer will be created</div>
         <button type="button" class="mode-start-btn" id="modePickerStart">Start</button>
       </div>
     </div>
@@ -4055,6 +4057,7 @@ const bottomToolbar = document.getElementById('bottomToolbar');
 const modeToggle = document.getElementById('modeToggle');
 const modePickerOverlay = document.getElementById('modePickerOverlay');
 const modePickerDialog = modePickerOverlay && modePickerOverlay.querySelector('.mode-picker-dialog');
+const modeFullfaceTooltip = document.getElementById('modeFullfaceTooltip');
 const paintLayerOverlay = document.getElementById('paintLayerOverlay');
 const paintLayerCreateBtn = document.getElementById('paintLayerCreateBtn');
 let pendingPaintRegionType = null;
@@ -4089,12 +4092,20 @@ function showModePicker() {
   modePickerOverlay.querySelectorAll('.mode-card').forEach(card => {
     card.classList.toggle('selected', card.dataset.mode === 'regional');
   });
+  if (modeFullfaceTooltip) {
+    modeFullfaceTooltip.classList.remove('visible');
+    modeFullfaceTooltip.setAttribute('aria-hidden', 'true');
+  }
 }
 
 function hideModePicker() {
   if (!modePickerOverlay) return;
   modePickerOverlay.classList.remove('visible');
   modePickerOverlay.setAttribute('aria-hidden', 'true');
+  if (modeFullfaceTooltip) {
+    modeFullfaceTooltip.classList.remove('visible');
+    modeFullfaceTooltip.setAttribute('aria-hidden', 'true');
+  }
 }
 
 function showPaintLayerDialog(regionType) {
@@ -4115,9 +4126,6 @@ function hidePaintLayerDialog() {
 function confirmFullFaceSelection() {
   if (!state.drawing.fullFaceInitialized) {
     const ensured = ensureFullFaceGroups();
-    if (ensured.createdAny) {
-      showToast('Full Face created Face, Eyes, and Lips Layer 1');
-    }
     state.drawing.fullFaceInitialized = true;
   }
   if (!canEnableFullFaceMode()) {
@@ -4304,6 +4312,11 @@ if (modePickerOverlay) {
       e.stopPropagation();
       modePickerOverlay.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
+      if (modeFullfaceTooltip) {
+        const show = card.dataset.mode === 'fullface';
+        modeFullfaceTooltip.classList.toggle('visible', show);
+        modeFullfaceTooltip.setAttribute('aria-hidden', show ? 'false' : 'true');
+      }
     });
   });
 }
