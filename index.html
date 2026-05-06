@@ -5427,9 +5427,12 @@ function renderGroupCard(g) {
 
 function renderAccessoryRow(a) {
   const meta = MAKEUP_ACCESSORY_TYPES[a.type];
+  const thumbUrl = a.type === 'eyebrow'
+    ? './assets/images/Eyebrows_thumbnail_placeholder.png'
+    : './assets/images/Eyelashes_thumbnail_placeholder.png';
   return `
     <div class="acc-row" data-acc-id="${a.id}">
-      <div class="acc-thumb"></div>
+      <div class="acc-thumb" style="background-image:url('${thumbUrl}');"></div>
       <div class="acc-name">${escapeHtml(a.name)}</div>
       <div class="cost-pill" data-action="acc-cost" data-acc-id="${a.id}">
         <span class="cost-hex"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L21 7v10l-9 5-9-5V7z"/></svg></span>
