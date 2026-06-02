@@ -2321,6 +2321,87 @@ input[type="range"]::-moz-range-progress {
 }
 
 /* ============================================================
+   ENTRY SCREEN — makeup shop (first screen on load)
+   ============================================================ */
+.entry-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 85;
+  overflow: hidden;
+  transition:
+    opacity 360ms var(--ease-out),
+    visibility 360ms var(--ease-out);
+}
+.entry-screen.dismissed {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.entry-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+}
+.entry-top-bar {
+  position: absolute;
+  top: 14px;
+  left: 52px;
+  z-index: 2;
+  pointer-events: none;
+}
+.entry-top-group {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  pointer-events: auto;
+}
+.entry-tap-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  color: transparent;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.entry-tap-btn:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+.entry-hotspot {
+  position: absolute;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+  border-radius: 10px;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.entry-hotspot:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+/* Glass doors — center of shop front */
+.entry-hotspot--door {
+  left: 38.5%;
+  top: 24%;
+  width: 21%;
+  height: 46%;
+}
+/* Customize kiosk to the right of the doors */
+.entry-hotspot--machine {
+  left: 59.5%;
+  top: 38%;
+  width: 13%;
+  height: 40%;
+}
+
+/* ============================================================
    AVATAR PREVIEW SCREEN (full-screen overlay)
    ============================================================ */
 .preview-screen {
@@ -2723,7 +2804,21 @@ input[type="range"]::-moz-range-progress {
 <body>
 
 <div class="phone-frame">
-  <div class="phone-screen">
+  <div class="phone-screen entry-mode" id="phoneScreen">
+
+    <!-- ENTRY — makeup shop (tap door or kiosk to continue) -->
+    <div class="entry-screen" id="entryScreen">
+      <img class="entry-bg" src="./assets/images/background.png" alt="Makeup shop">
+      <div class="entry-top-bar">
+        <div class="entry-top-group">
+          <button type="button" class="entry-tap-btn" aria-label="Diamond"></button>
+          <button type="button" class="entry-tap-btn" aria-label="Menu"></button>
+          <button type="button" class="entry-tap-btn" aria-label="Chat"></button>
+        </div>
+      </div>
+      <button type="button" class="entry-hotspot entry-hotspot--door" id="entryDoorHotspot" aria-label="Enter shop"></button>
+      <button type="button" class="entry-hotspot entry-hotspot--machine" id="entryMachineHotspot" aria-label="Customize makeup"></button>
+    </div>
 
     <!-- BACKGROUND SCENE -->
     <div class="stage">
@@ -6431,10 +6526,29 @@ function doRemoveLayer(ctx) {
 }
 
 /* ============================================================
+   ENTRY SCREEN
+   ============================================================ */
+const entryScreen = document.getElementById('entryScreen');
+const phoneScreen = document.getElementById('phoneScreen');
+
+function enterFromEntry() {
+  if (!entryScreen || entryScreen.classList.contains('dismissed')) return;
+  entryScreen.classList.add('dismissed');
+  if (phoneScreen) phoneScreen.classList.remove('entry-mode');
+}
+
+if (entryScreen) {
+  document.getElementById('entryDoorHotspot')?.addEventListener('click', enterFromEntry);
+  document.getElementById('entryMachineHotspot')?.addEventListener('click', enterFromEntry);
+  entryScreen.querySelectorAll('.entry-tap-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => e.stopPropagation());
+  });
+}
+
+/* ============================================================
    AVATAR PREVIEW SCREEN
    ============================================================ */
 const previewScreen = document.getElementById('previewScreen');
-const phoneScreen = document.querySelector('.phone-screen');
 const previewSingle = document.getElementById('previewSingle');
 const previewCarousel = document.getElementById('previewCarousel');
 const ownedPanel = document.getElementById('ownedPanel');
