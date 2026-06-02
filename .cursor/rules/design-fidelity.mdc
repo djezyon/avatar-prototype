@@ -1,0 +1,7 @@
+---
+description: Apply the design collaboration checklist when implementing UI from references.
+globs: index.html
+alwaysApply: false
+---
+
+When implementing or adjusting UI (layout, typography, color, or components from Figma or screenshots), read and follow `docs/design-collaboration-checklist.md`: use one source of truth per change, prefer explicit measurements and design-tool inspect values over guessing from images, isolate scoped selectors for unique components, and verify at the tray or viewport width that matters.
