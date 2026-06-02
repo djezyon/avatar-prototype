@@ -2225,23 +2225,6 @@ input[type="range"]::-moz-range-progress {
   color: var(--text-primary);
   background: rgba(255, 255, 255, 0.06);
 }
-#panel-makeup .makeup-mode-toggle {
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
-  padding: 4px;
-  margin: 8px 4px;
-  border-radius: var(--r-pill);
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
-}
-#panel-makeup .makeup-mode-toggle .mode-segment {
-  flex: 1 1 0;
-  justify-content: center;
-  padding: 8px 12px;
-  font-size: 14px;
-}
-
 /* ============================================================
    TOP BAR — tray-aware behavior
    ============================================================ */
@@ -5410,10 +5393,6 @@ function renderMakeupPanel() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
     </div>
-    <div class="makeup-mode-toggle" id="makeupModeToggle">
-      <button type="button" class="mode-segment ${state.drawing.mode === 'regional' ? 'active' : ''}" data-mode="regional">Regional</button>
-      <button type="button" class="mode-segment ${state.drawing.mode === 'fullface' ? 'active' : ''}" data-mode="fullface">Full Face</button>
-    </div>
   `;
 
   // Makeup items section
@@ -5572,25 +5551,6 @@ function renderAccessoryRow(a) {
    MAKEUP — INTERACTIONS
    ============================================================ */
 function attachMakeupHandlers() {
-  const makeupModeToggle = document.getElementById('makeupModeToggle');
-  if (makeupModeToggle) {
-    makeupModeToggle.querySelectorAll('.mode-segment').forEach(seg => {
-      seg.addEventListener('click', () => {
-        const mode = seg.dataset.mode;
-        if (!mode || mode === state.drawing.mode) return;
-        if (mode === 'fullface') {
-          if (!confirmFullFaceSelection()) return;
-        } else {
-          state.drawing.mode = 'regional';
-          localStorage.setItem('drawMode', 'regional');
-          updateModeTogglePill();
-          maybeToastRegionalLayerPrompt();
-        }
-        renderMakeupPanel();
-      });
-    });
-  }
-
   // Top progress + button
   const progAdd = document.getElementById('progressAddBtn');
   if (progAdd) progAdd.addEventListener('click', (e) => {
