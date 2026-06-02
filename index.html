@@ -19,6 +19,13 @@
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.65);
   --text-tertiary: rgba(255, 255, 255, 0.45);
+  --content-emphasis: #F7F7F8;
+
+  /* title-large (side sheet / tray) */
+  --ALPHA-Text-TitleLarge-FontFamily: "Builder Sans", var(--font-display), system-ui, -apple-system, sans-serif;
+  --ALPHA-Text-TitleLarge-FontSize: 16px;
+  --ALPHA-Text-TitleLarge-LineHeight: 22px;
+  --ALPHA-Text-TitleLarge-LetterSpacing: 0;
 
   /* Brand */
   --brand-blue: #335FFF;
@@ -45,6 +52,8 @@
   --s-4: 16px;
   --s-5: 20px;
   --s-6: 24px;
+  --padding-none: 0;
+  --gap-xsmall: 4px;
 
   /* Toolbar dims */
   --tray-w: 320px;
@@ -663,10 +672,13 @@ body.is-sticker-dragging .draw-canvas { cursor: inherit; }
   padding: 12px 8px 8px 8px;
 }
 .tray-title {
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: -0.01em;
+  color: var(--content-emphasis, #F7F7F8);
+  font-family: var(--ALPHA-Text-TitleLarge-FontFamily, "Builder Sans", var(--font-display), system-ui, sans-serif);
+  font-size: var(--ALPHA-Text-TitleLarge-FontSize, 16px);
+  font-style: normal;
+  font-weight: 700;
+  line-height: var(--ALPHA-Text-TitleLarge-LineHeight, 22px);
+  letter-spacing: var(--ALPHA-Text-TitleLarge-LetterSpacing, 0);
 }
 .tray-mode-toggle {
   display: none;
@@ -1263,25 +1275,36 @@ input[type="range"]::-moz-range-progress {
 }
 .makeup-items-header {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   padding: 0 4px;
 }
-.makeup-items-copy {
-  flex: 1;
+.makeup-items-copy,
+.makeup-section-heading {
+  display: flex;
+  height: 28px;
+  padding: 0 0 var(--padding-none, 0) 0;
+  align-items: center;
+  gap: var(--gap-xsmall, 4px);
+  flex: 1 0 0;
   min-width: 0;
 }
-.makeup-items-title {
+.makeup-items-title,
+.makeup-section-heading {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.4;
+  line-height: 1;
+  white-space: nowrap;
 }
 .makeup-items-subtitle {
-  margin-top: 4px;
   font-size: 13px;
+  font-weight: 500;
   color: var(--text-secondary);
-  line-height: 1.3;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .progress-track {
   flex: 1;
@@ -1393,14 +1416,21 @@ input[type="range"]::-moz-range-progress {
 /* Subtitle row (replaces progress bar) */
 .makeup-subtitle-row {
   display: flex;
+  height: 28px;
+  padding: 0 0 var(--padding-none, 0) 0;
   align-items: center;
-  gap: 12px;
-  padding: 0 4px 4px 4px;
+  gap: var(--gap-xsmall, 4px);
+  flex: 1 0 0;
+  min-width: 0;
 }
 .makeup-subtitle {
-  flex: 1;
   font-size: 13px;
+  font-weight: 500;
   color: var(--text-secondary);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Accessory row (compact list row) */
@@ -1432,32 +1462,26 @@ input[type="range"]::-moz-range-progress {
 
 /* Section label between cards */
 .section-heading {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  padding: 4px 4px 2px 4px;
-  margin-top: 4px;
+  padding: 0 4px;
+  margin-top: 0;
 }
-#panel-makeup .makeup-items-title {
+#panel-makeup .makeup-items-title,
+#panel-makeup .makeup-section-heading {
   font-size: 14px;
-  line-height: 1;
 }
 #panel-makeup .makeup-items-subtitle {
-  font-size: 14px;
-  line-height: 1;
-}
-#panel-makeup .section-heading {
-  font-size: 14px;
-  line-height: 1;
+  font-size: 13px;
 }
 #panel-makeup .makeup-items-header {
-  align-items: center;
   justify-content: space-between;
-  gap: 8px;
   padding: 0 8px 0 4px;
 }
 #panel-makeup .progress-add {
   margin-left: auto;
+  flex-shrink: 0;
+}
+#panel-makeup .makeup-section-heading {
+  padding: 0 4px;
 }
 #panel-makeup .makeup-panel > * + * {
   margin-top: 8px;
@@ -1465,10 +1489,6 @@ input[type="range"]::-moz-range-progress {
 #panel-makeup .makeup-panel > .group-card + .group-drop-zone,
 #panel-makeup .makeup-panel > .group-drop-zone + .group-card,
 #panel-makeup .makeup-panel > .group-drop-zone + .group-drop-zone {
-  margin-top: 0;
-}
-#panel-makeup .section-heading {
-  padding: 0 4px;
   margin-top: 0;
 }
 .makeup-section-divider {
@@ -5499,7 +5519,10 @@ function renderMakeupPanel() {
 
   html += `
     <div class="makeup-items-header">
-      <div class="makeup-items-title">Makeup items</div>
+      <div class="makeup-items-copy">
+        <div class="makeup-items-title">Makeup items</div>
+        <div class="makeup-items-subtitle">Create up to ${MAKEUP_MAX_GROUPS} makeup items</div>
+      </div>
       <button type="button" class="progress-add${cappedClass(makeupAddDisabled)}" id="progressAddBtn" aria-label="Add makeup item"${cappedAria(makeupAddDisabled)}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
@@ -5531,7 +5554,7 @@ function renderMakeupPanel() {
   html += `<div class="makeup-section-divider"></div>`;
 
   // Face Accessories section
-  html += `<div class="section-heading">Face Accessories</div>`;
+  html += `<div class="makeup-section-heading section-heading">Face Accessories</div>`;
 
   if (accs.length === 0) {
     html += `
