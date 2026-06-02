@@ -595,16 +595,18 @@ body.is-sticker-dragging .draw-canvas { cursor: inherit; }
   bottom: 18px;
   right: 18px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 4px;
   background: var(--brand-blue);
   border: none;
   color: white;
-  padding: 10px 16px;
+  padding: 10px 14px;
+  min-width: 76px;
   border-radius: var(--r-pill);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 15px;
   cursor: pointer;
   z-index: 60;
   transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
@@ -612,16 +614,25 @@ body.is-sticker-dragging .draw-canvas { cursor: inherit; }
 }
 .robux-btn:hover { background: var(--brand-blue-hover); }
 .robux-btn:active { transform: scale(0.97); }
-.robux-icon {
-  width: 18px;
-  height: 18px;
-  background: rgba(255,255,255,0.18);
-  border-radius: 4px;
+.robux-item-count {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.robux-price-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+}
+.robux-price-row img {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex-shrink: 0;
 }
 
 /* ============================================================
@@ -1313,9 +1324,16 @@ input[type="range"]::-moz-range-progress {
   flex-shrink: 0;
 }
 .progress-add:hover { background: rgba(255,255,255,0.08); }
-.progress-add:disabled, .btn-blue:disabled {
-  opacity: 0.4;
+.progress-add.is-capped,
+.btn-blue.is-capped,
+.progress-add:disabled,
+.btn-blue:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
+}
+.progress-add.is-capped:hover,
+.btn-blue.is-capped:hover {
+  background: transparent;
 }
 .progress-add svg { width: 18px; height: 18px; }
 
@@ -1865,8 +1883,8 @@ input[type="range"]::-moz-range-progress {
   background: var(--surface-card);
   border-radius: 14px;
   border: 1px solid rgba(208, 217, 251, 0.12);
-  padding: 8px;
-  width: 240px;
+  padding: 8px 8px 10px;
+  width: 260px;
   box-shadow:
     0 2px 4px rgba(4, 4, 8, 0.25),
     0 10px 20px rgba(4, 4, 8, 0.25),
@@ -1883,11 +1901,18 @@ input[type="range"]::-moz-range-progress {
   opacity: 1;
   transform: scale(1);
 }
+.menu-popup .menu-popup-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding: 6px 10px 8px;
+  line-height: 1.25;
+}
 .menu-popup .menu-section-label {
   font-size: 13px;
   font-weight: 700;
   color: var(--text-secondary);
-  padding: 8px 10px 6px 10px;
+  padding: 10px 10px 6px;
 }
 .menu-popup .menu-item {
   display: flex;
@@ -1896,7 +1921,7 @@ input[type="range"]::-moz-range-progress {
   padding: 9px 10px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
   color: var(--text-primary);
   border: none;
   background: transparent;
@@ -1906,43 +1931,60 @@ input[type="range"]::-moz-range-progress {
   font-weight: 500;
   text-align: left;
 }
-.menu-popup .menu-item:hover { background: rgba(255,255,255,0.06); }
-.menu-popup .menu-item.focused {
-  background: var(--brand-blue);
+.menu-popup .menu-item-leading {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
 }
-.menu-popup .menu-item.focused:hover { background: var(--brand-blue-hover); }
-.menu-popup .menu-item:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+.menu-popup .menu-item-leading svg {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
-.menu-popup .menu-item:disabled:hover { background: transparent; }
-.menu-popup .menu-item svg { width: 20px; height: 20px; flex-shrink: 0; }
-.menu-limit-tooltip {
+.menu-popup .menu-item-label {
+  flex: 1;
+  min-width: 0;
+}
+.menu-popup .menu-item-price {
   display: inline-flex;
   align-items: center;
-  position: absolute;
-  right: 8px;
-  top: -42px;
-  background: #fff;
-  color: #202327;
-  border-radius: 10px;
-  padding: 8px 10px;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.menu-popup .menu-robux-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex-shrink: 0;
+}
+.menu-popup .menu-item:hover:not(:disabled) { background: rgba(255,255,255,0.06); }
+.menu-popup .menu-item.focused:not(:disabled) {
+  background: var(--brand-blue);
+}
+.menu-popup .menu-item.focused:not(:disabled):hover { background: var(--brand-blue-hover); }
+.menu-popup .menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--text-secondary);
+}
+.menu-popup .menu-item:disabled .menu-item-price {
+  color: var(--text-secondary);
+}
+.menu-popup .menu-item:disabled:hover { background: transparent; }
+.menu-popup .menu-footer {
+  margin-top: 4px;
+  padding: 8px 10px 2px;
   font-size: 13px;
   font-weight: 500;
-  line-height: 1.2;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-  white-space: nowrap;
-}
-.menu-limit-tooltip::after {
-  content: '';
-  position: absolute;
-  right: 14px;
-  top: 100%;
-  width: 0;
-  height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-top: 8px solid #fff;
+  color: var(--text-secondary);
+  line-height: 1.3;
 }
 
 .menu-popup-backdrop {
@@ -2767,6 +2809,20 @@ input[type="range"]::-moz-range-progress {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+.toast.toast-limit {
+  background: #ffffff;
+  color: #202327;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  max-width: min(320px, calc(100% - 32px));
+  white-space: normal;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
 
 /* ============================================================
    HELP TEXT (outside frame)
@@ -2893,9 +2949,12 @@ input[type="range"]::-moz-range-progress {
     </div>
 
     <!-- ROBUX BUTTON -->
-    <button class="robux-btn" id="robuxBtn">
-      <span class="robux-icon">R$</span>
-      <span>175</span>
+    <button class="robux-btn" id="robuxBtn" type="button">
+      <span class="robux-item-count" id="robuxItemCount">0 Items</span>
+      <span class="robux-price-row">
+        <img src="./assets/icons/robux_icon.png" alt="" width="18" height="18">
+        <span id="robuxTotal">0</span>
+      </span>
     </button>
 
     <!-- SIDE TRAY -->
@@ -3233,6 +3292,8 @@ const state = {
 
 // Limits and config
 const MAKEUP_MAX_GROUPS = 6;
+const ROBUX_ITEM_PRICE = 90;
+const ROBUX_ICON_SRC = './assets/icons/robux_icon.png';
 const STICKER_MAX = 3;
 /** Library tiles — drop PNGs at these paths (3×3 grid in tray). */
 const STICKER_LIBRARY_SRC = Array.from({ length: 9 }, (_, i) =>
@@ -3240,13 +3301,13 @@ const STICKER_LIBRARY_SRC = Array.from({ length: 9 }, (_, i) =>
 );
 const stickerImageCache = new Map(); // id -> HTMLImageElement
 const MAKEUP_GROUP_TYPES = {
-  face:  { label: 'Face Group', basePrice: 90 },
-  eye:   { label: 'Eye Group',  basePrice: 60 },
-  lips:  { label: 'Lips Group', basePrice: 45 },
+  face:  { label: 'Face Group', menuLabel: 'Face', basePrice: ROBUX_ITEM_PRICE },
+  eye:   { label: 'Eye Group', menuLabel: 'Eyes', basePrice: ROBUX_ITEM_PRICE },
+  lips:  { label: 'Lips Group', menuLabel: 'Lips', basePrice: ROBUX_ITEM_PRICE },
 };
 const MAKEUP_ACCESSORY_TYPES = {
-  eyelash: { label: 'Eyelashes', basePrice: 90 },
-  eyebrow: { label: 'Eyebrows', basePrice: 90 },
+  eyelash: { label: 'Eyelashes', menuLabel: 'Eyelashes', basePrice: ROBUX_ITEM_PRICE },
+  eyebrow: { label: 'Eyebrows', menuLabel: 'Eyebrows', basePrice: ROBUX_ITEM_PRICE },
 };
 
 /** Brush preset → stroke tuning (used in paintStrokeOnLayerSurface) */
@@ -4879,10 +4940,21 @@ document.getElementById('robuxBtn').addEventListener('click', () => {
 const toastEl = document.getElementById('toast');
 let toastTimer = null;
 function showToast(msg) {
+  toastEl.classList.remove('toast-limit');
   toastEl.textContent = msg;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1600);
+}
+
+function showLimitToast(msg) {
+  toastEl.classList.add('toast-limit');
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastEl.classList.remove('show', 'toast-limit');
+  }, 2400);
 }
 
 /* ============================================================
@@ -5303,6 +5375,40 @@ function isAccessoryTypeUsed(type) {
   return state.makeup.accessories.some(a => a.type === type);
 }
 
+function isMakeupAtCap() {
+  return getGroupCount() >= MAKEUP_MAX_GROUPS;
+}
+
+function isAccessoriesAtCap() {
+  return isAccessoryTypeUsed('eyelash') && isAccessoryTypeUsed('eyebrow');
+}
+
+function getBillableItemCount() {
+  return state.makeup.groups.length + state.makeup.accessories.length;
+}
+
+function getRobuxTotal() {
+  return getBillableItemCount() * ROBUX_ITEM_PRICE;
+}
+
+function updateRobuxDisplay() {
+  const count = getBillableItemCount();
+  const countEl = document.getElementById('robuxItemCount');
+  const totalEl = document.getElementById('robuxTotal');
+  if (countEl) {
+    countEl.textContent = count === 1 ? '1 Item' : `${count} Items`;
+  }
+  if (totalEl) totalEl.textContent = String(getRobuxTotal());
+}
+
+function showMaxMakeupSnackbar() {
+  showLimitToast('Max 6 items. Remove one to add another');
+}
+
+function showMaxAccessoriesSnackbar() {
+  showLimitToast('Max accessories. Remove one to add another');
+}
+
 function makeThumbDataURLFromSurface(surface, size = 32, pad = 2) {
   if (!surface) return '';
   const sctx = surface.getContext('2d');
@@ -5384,12 +5490,17 @@ function renderMakeupPanel() {
   const accs = state.makeup.accessories;
   const groupCount = getGroupCount();
 
+  const makeupAddDisabled = isMakeupAtCap();
+  const accAddDisabled = isAccessoriesAtCap();
+  const cappedClass = (on) => on ? ' is-capped' : '';
+  const cappedAria = (on) => on ? ' aria-disabled="true"' : '';
+
   let html = '';
 
   html += `
     <div class="makeup-items-header">
       <div class="makeup-items-title">Makeup items</div>
-      <button class="progress-add" id="progressAddBtn" aria-label="Add makeup item">
+      <button type="button" class="progress-add${cappedClass(makeupAddDisabled)}" id="progressAddBtn" aria-label="Add makeup item"${cappedAria(makeupAddDisabled)}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
     </div>
@@ -5404,7 +5515,7 @@ function renderMakeupPanel() {
         </div>
         <div class="empty-title">Make an item to get started.</div>
         <div class="empty-sub">Create up to ${MAKEUP_MAX_GROUPS} makeup items</div>
-        <button class="btn-blue" id="addMakeupItemBtn">Add a Makeup Item</button>
+        <button type="button" class="btn-blue${cappedClass(makeupAddDisabled)}" id="addMakeupItemBtn"${cappedAria(makeupAddDisabled)}>Add a Makeup Item</button>
       </div>
     `;
   } else {
@@ -5430,7 +5541,7 @@ function renderMakeupPanel() {
         </div>
         <div class="empty-title">Make an Accessory to get started.</div>
         <div class="empty-sub">You can add 1 Eyelashes and 1 Eyebrows</div>
-        <button class="btn-blue" id="addAccessoriesBtn">Add Accessories</button>
+        <button type="button" class="btn-blue${cappedClass(accAddDisabled)}" id="addAccessoriesBtn"${cappedAria(accAddDisabled)}>Add Accessories</button>
       </div>
     `;
   } else {
@@ -5442,6 +5553,7 @@ function renderMakeupPanel() {
   makeupPanelEl.innerHTML = html;
   makeupPanelEl.querySelectorAll('input[type="range"]').forEach(updateRangeFill);
   attachMakeupHandlers();
+  updateRobuxDisplay();
   if (typeof compositeAllLayersToDisplay === 'function') compositeAllLayersToDisplay();
 }
 
@@ -5507,7 +5619,7 @@ function renderGroupCard(g) {
         <img class="group-chip" src="./assets/chips/Property_1_${g.type === 'face' ? 'Face' : g.type === 'eye' ? 'Eyes' : 'Lips'}.svg" alt="${meta.label}">
         <button class="cost-pill" data-action="group-cost" data-group-id="${g.id}">
           <span class="cost-hex">
-            <img src="./assets/icons/roblox_logo.png" alt="">
+            <img src="${ROBUX_ICON_SRC}" alt="">
           </span>
           <span class="cost-value">${meta.basePrice}</span>
         </button>
@@ -5536,7 +5648,7 @@ function renderAccessoryRow(a) {
       <div class="acc-thumb" style="background-image:url('${thumbUrl}');"></div>
       <div class="acc-name">${escapeHtml(a.name)}</div>
       <div class="cost-pill" data-action="acc-cost" data-acc-id="${a.id}">
-        <span class="cost-hex"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L21 7v10l-9 5-9-5V7z"/></svg></span>
+        <span class="cost-hex"><img src="${ROBUX_ICON_SRC}" alt=""></span>
         <span>${meta.basePrice}</span>
       </div>
       <div class="checkbox ${a.visible ? 'checked' : ''}" data-action="acc-vis" data-acc-id="${a.id}"></div>
@@ -5553,16 +5665,32 @@ function renderAccessoryRow(a) {
 function attachMakeupHandlers() {
   // Top progress + button
   const progAdd = document.getElementById('progressAddBtn');
-  if (progAdd) progAdd.addEventListener('click', (e) => {
-    openMenuPopup(progAdd, 'all');
+  if (progAdd) progAdd.addEventListener('click', () => {
+    if (isMakeupAtCap()) {
+      showMaxMakeupSnackbar();
+      return;
+    }
+    openMenuPopup(progAdd, isAccessoriesAtCap() ? 'makeup' : 'all');
   });
 
   // Empty state CTAs
   const addMakeup = document.getElementById('addMakeupItemBtn');
-  if (addMakeup) addMakeup.addEventListener('click', () => openMenuPopup(addMakeup, 'makeup'));
+  if (addMakeup) addMakeup.addEventListener('click', () => {
+    if (isMakeupAtCap()) {
+      showMaxMakeupSnackbar();
+      return;
+    }
+    openMenuPopup(addMakeup, 'makeup');
+  });
 
   const addAcc = document.getElementById('addAccessoriesBtn');
-  if (addAcc) addAcc.addEventListener('click', () => openMenuPopup(addAcc, 'accessories'));
+  if (addAcc) addAcc.addEventListener('click', () => {
+    if (isAccessoriesAtCap()) {
+      showMaxAccessoriesSnackbar();
+      return;
+    }
+    openMenuPopup(addAcc, 'accessories');
+  });
 
   // Group / layer interactions via delegation
   makeupPanelEl.querySelectorAll('[data-action]').forEach(el => {
@@ -5607,8 +5735,7 @@ function attachMakeupHandlers() {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const g = state.makeup.groups.find(x => x.id === groupId);
-        const amount = g ? MAKEUP_GROUP_TYPES[g.type].basePrice : 90;
-        showToast('Robux will be charged when checkout');
+        showToast('Pay when checkout');
       });
     }
     if (action === 'group-menu') {
@@ -5902,38 +6029,51 @@ const menuPopup = document.getElementById('menuPopup');
 const menuPopupBackdrop = document.getElementById('menuPopupBackdrop');
 let menuPopupItems = []; // for keyboard nav
 
+function renderMenuPrice() {
+  return `<span class="menu-item-price"><img class="menu-robux-icon" src="${ROBUX_ICON_SRC}" alt=""><span>${ROBUX_ITEM_PRICE}</span></span>`;
+}
+
+function renderMenuItemRow(type, cat, opts) {
+  const meta = cat === 'group' ? MAKEUP_GROUP_TYPES[type] : MAKEUP_ACCESSORY_TYPES[type];
+  const label = meta.menuLabel || meta.label;
+  const disabled = !!opts.disabled;
+  const focused = !!opts.focused && !disabled;
+  return `<button type="button" class="menu-item${focused ? ' focused' : ''}" data-menu-type="${type}" data-menu-cat="${cat}"${disabled ? ' disabled' : ''}>
+    <span class="menu-item-leading">${MENU_ICONS[type]}</span>
+    <span class="menu-item-label">${escapeHtml(label)}</span>
+    ${renderMenuPrice()}
+  </button>`;
+}
+
 function openMenuPopup(anchorEl, mode) {
   // mode: 'all' | 'makeup' | 'accessories'
   const showMakeup = mode === 'all' || mode === 'makeup';
   const showAcc = mode === 'all' || mode === 'accessories';
-  const groupAtCap = getGroupCount() >= MAKEUP_MAX_GROUPS;
+  const groupAtCap = isMakeupAtCap();
 
   let html = '';
   let firstFocusableAssigned = false;
   if (showMakeup) {
-    if (groupAtCap) {
-      html += `<div class="menu-limit-tooltip">Layer limit reached — remove one to add more</div>`;
-    }
-    html += `<div class="menu-section-label">Add Makeup Item</div>`;
-    ['face','eye','lips'].forEach((t, i) => {
-      // First non-disabled item gets focus
-      const focused = (!groupAtCap && !firstFocusableAssigned);
+    html += `<div class="menu-popup-title">Add Makeup Item</div>`;
+    ['face', 'eye', 'lips'].forEach((t) => {
+      const disabled = groupAtCap;
+      const focused = !disabled && !firstFocusableAssigned;
       if (focused) firstFocusableAssigned = true;
-      html += `<button class="menu-item ${focused ? 'focused' : ''}" data-menu-type="${t}" data-menu-cat="group" ${groupAtCap ? 'disabled' : ''}>
-        ${MENU_ICONS[t]}<span>${MAKEUP_GROUP_TYPES[t].label}</span>
-      </button>`;
+      html += renderMenuItemRow(t, 'group', { disabled, focused });
     });
   }
   if (showAcc) {
-    html += `<div class="menu-section-label">Add Accessories</div>`;
-    ['eyelash','eyebrow'].forEach((t, i) => {
-      const used = isAccessoryTypeUsed(t);
-      const focused = (!used && !firstFocusableAssigned);
+    if (showMakeup) html += `<div class="menu-section-label" style="padding-top:14px;">Add Eyelashes &amp; Eyebrows</div>`;
+    else html += `<div class="menu-popup-title">Add Eyelashes &amp; Eyebrows</div>`;
+    ['eyelash', 'eyebrow'].forEach((t) => {
+      const disabled = isAccessoryTypeUsed(t);
+      const focused = !disabled && !firstFocusableAssigned;
       if (focused) firstFocusableAssigned = true;
-      html += `<button class="menu-item ${focused ? 'focused' : ''}" data-menu-type="${t}" data-menu-cat="accessory" ${used ? 'disabled' : ''}>
-        ${MENU_ICONS[t]}<span>${MAKEUP_ACCESSORY_TYPES[t].label}</span>
-      </button>`;
+      html += renderMenuItemRow(t, 'accessory', { disabled, focused });
     });
+  }
+  if (showMakeup || showAcc) {
+    html += `<div class="menu-footer">Pay when checkout</div>`;
   }
 
   menuPopup.innerHTML = html;
@@ -6012,13 +6152,14 @@ document.addEventListener('keydown', (e) => {
 function onMenuPick(type, cat) {
   closeMenuPopup();
   if (cat === 'group') {
-    if (getGroupCount() >= MAKEUP_MAX_GROUPS) {
+    if (isMakeupAtCap()) {
+      showMaxMakeupSnackbar();
       return;
     }
     addMakeupGroup(type);
   } else if (cat === 'accessory') {
     if (isAccessoryTypeUsed(type)) {
-      showToast('Already added');
+      showMaxAccessoriesSnackbar();
       return;
     }
     addAccessory(type);
@@ -6643,6 +6784,7 @@ updateAlphaThumb();
 updateBrushPreviews();
 renderPalette();
 renderMakeupPanel();
+updateRobuxDisplay();
 if (typeof compositeAllLayersToDisplay === 'function') compositeAllLayersToDisplay();
 if (typeof bindStickerManipLayerOnce === 'function') bindStickerManipLayerOnce();
 if (typeof bindStickerFileInputOnce === 'function') bindStickerFileInputOnce();
